@@ -1,0 +1,13 @@
+.agents/skills/
+.claude/skills/
+convex/_generated/
+example/convex/_generated/
+pnpm-lock.yaml
+coverage/
+dist/
+playwright-report/
+test-results/
+BUILD_PLAN.md
+PRD.md
+research/
+.env.example
