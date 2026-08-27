@@ -1,10 +1,19 @@
-import { render, screen } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { cleanup, render, screen } from "@testing-library/react";
+import { MemoryRouter } from "react-router-dom";
+import { afterEach, describe, expect, it } from "vitest";
 import App from "./App";
+
+afterEach(() => {
+  cleanup();
+});
 
 describe("landing shell", () => {
   it("shows AidLens brand and primary CTAs", () => {
-    render(<App />);
+    render(
+      <MemoryRouter>
+        <App />
+      </MemoryRouter>,
+    );
 
     expect(
       screen.getByRole("heading", { name: "AidLens" }),

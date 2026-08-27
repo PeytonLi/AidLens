@@ -17,6 +17,8 @@ export default defineConfig([
       "tailwind.config.js",
       "vite.config.ts",
       "vitest.config.ts",
+      "playwright.config.ts",
+      "e2e/**",
     ],
   },
   {

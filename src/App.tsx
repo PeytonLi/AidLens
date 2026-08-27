@@ -1,4 +1,68 @@
-export default function App() {
+import { Link, Navigate, Route, Routes } from "react-router-dom";
+import type { ReactNode } from "react";
+import SamplePage from "./features/sample/SamplePage";
+
+function LandingPage() {
+  return (
+    <main id="main" className="landing">
+      <section className="hero" aria-labelledby="brand-heading">
+        <h1 id="brand-heading" className="brand-hero">
+          AidLens
+        </h1>
+        <p className="hero-headline">
+          Know what each college will really cost.
+        </p>
+        <p className="hero-support">
+          Forward your financial-aid offers. AidLens separates free aid from
+          borrowing, estimates the four-year cost, flags missing terms, and
+          helps you get answers from each school.
+        </p>
+        <div className="hero-actions">
+          <Link to="/sample" className="btn btn-primary">
+            Try the sample
+          </Link>
+          <Link to="/auth" className="btn btn-secondary">
+            Compare my offers
+          </Link>
+        </div>
+      </section>
+
+      <section className="how-it-works" aria-labelledby="how-heading">
+        <h2 id="how-heading">How it works</h2>
+        <ol className="steps">
+          <li>
+            <span className="step-num">1</span>
+            <div>
+              <h3>Bring your offers</h3>
+              <p>Upload letters or forward them to your AidLens inbox.</p>
+            </div>
+          </li>
+          <li>
+            <span className="step-num">2</span>
+            <div>
+              <h3>Compare real costs</h3>
+              <p>
+                See grants, loans, and estimated four-year cost side by side.
+              </p>
+            </div>
+          </li>
+          <li>
+            <span className="step-num">3</span>
+            <div>
+              <h3>Ask the school</h3>
+              <p>
+                Draft a precise question, approve the send, and update when they
+                reply.
+              </p>
+            </div>
+          </li>
+        </ol>
+      </section>
+    </main>
+  );
+}
+
+function AppShell({ children }: { children: ReactNode }) {
   return (
     <div className="app-shell">
       <a href="#main" className="skip-link">
@@ -11,67 +75,13 @@ export default function App() {
             AidLens
           </p>
           <nav aria-label="Primary">
-            <a href="/sample">Sample</a>
-            <a href="/auth">Sign in</a>
+            <Link to="/sample">Sample</Link>
+            <Link to="/auth">Sign in</Link>
           </nav>
         </div>
       </header>
 
-      <main id="main" className="landing">
-        <section className="hero" aria-labelledby="brand-heading">
-          <h1 id="brand-heading" className="brand-hero">
-            AidLens
-          </h1>
-          <p className="hero-headline">
-            Know what each college will really cost.
-          </p>
-          <p className="hero-support">
-            Forward your financial-aid offers. AidLens separates free aid from
-            borrowing, estimates the four-year cost, flags missing terms, and
-            helps you get answers from each school.
-          </p>
-          <div className="hero-actions">
-            <a href="/sample" className="btn btn-primary">
-              Try the sample
-            </a>
-            <a href="/auth" className="btn btn-secondary">
-              Compare my offers
-            </a>
-          </div>
-        </section>
-
-        <section className="how-it-works" aria-labelledby="how-heading">
-          <h2 id="how-heading">How it works</h2>
-          <ol className="steps">
-            <li>
-              <span className="step-num">1</span>
-              <div>
-                <h3>Bring your offers</h3>
-                <p>Upload letters or forward them to your AidLens inbox.</p>
-              </div>
-            </li>
-            <li>
-              <span className="step-num">2</span>
-              <div>
-                <h3>Compare real costs</h3>
-                <p>
-                  See grants, loans, and estimated four-year cost side by side.
-                </p>
-              </div>
-            </li>
-            <li>
-              <span className="step-num">3</span>
-              <div>
-                <h3>Ask the school</h3>
-                <p>
-                  Draft a precise question, approve the send, and update when
-                  they reply.
-                </p>
-              </div>
-            </li>
-          </ol>
-        </section>
-      </main>
+      {children}
 
       <footer className="site-footer">
         <div className="site-footer__inner">
@@ -89,5 +99,17 @@ export default function App() {
         </div>
       </footer>
     </div>
+  );
+}
+
+export default function App() {
+  return (
+    <AppShell>
+      <Routes>
+        <Route path="/" element={<LandingPage />} />
+        <Route path="/sample" element={<SamplePage />} />
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+    </AppShell>
   );
 }
