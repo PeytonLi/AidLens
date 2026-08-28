@@ -193,7 +193,7 @@ test("owner deletion blocks access and late work observes a stale generation", a
   });
 });
 
-test("only an owner can choose a school in the same workspace and deletion cascades it", async () => {
+test("only an owner can choose a school and deletion cascades private children", async () => {
   const t = createTest();
   const { client: alice } = await authenticated(t, "alice@example.com");
   const { client: bob } = await authenticated(t, "bob@example.com");
@@ -259,8 +259,45 @@ test("only an owner can choose a school in the same workspace and deletion casca
     }),
   ).rejects.toHaveProperty("message", "Not found");
 
+  const { storageId, documentId, auditId } = await t.run(async (ctx) => {
+    const now = Date.now();
+    const storageId = await ctx.storage.store(new Blob(["private offer"]));
+    const documentId = await ctx.db.insert("offerDocuments", {
+      workspaceId: aliceIds.workspaceId,
+      schoolId: aliceSchoolId,
+      storageId,
+      fileName: "offer.pdf",
+      mimeType: "application/pdf",
+      byteSize: 13,
+      sha256: "workspace-delete-fixture",
+      sourceRoute: "upload",
+      retentionDeadline: now + 60_000,
+      rawState: "present",
+      processingState: "received",
+      processingGeneration: 0,
+      createdAt: now,
+      updatedAt: now,
+    });
+    const auditId = await ctx.db.insert("auditEvents", {
+      workspaceId: aliceIds.workspaceId,
+      actor: "system",
+      eventType: "fixture",
+      documentId,
+      createdAt: now,
+    });
+    return { storageId, documentId, auditId };
+  });
+
   await alice.mutation(remove, { workspaceId: aliceIds.workspaceId });
+  await t.finishAllScheduledFunctions(() => {});
   await expect(
     t.run((ctx) => ctx.db.get("schools", aliceSchoolId)),
   ).resolves.toBeNull();
+  await expect(
+    t.run((ctx) => ctx.db.get("offerDocuments", documentId)),
+  ).resolves.toBeNull();
+  await expect(
+    t.run((ctx) => ctx.db.get("auditEvents", auditId)),
+  ).resolves.toBeNull();
+  await expect(t.run((ctx) => ctx.storage.get(storageId))).resolves.toBeNull();
 });

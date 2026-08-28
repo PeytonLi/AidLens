@@ -1,4 +1,4 @@
-import { useAuthActions } from "@convex-dev/auth/react";
+import { useAuthActions, useAuthToken } from "@convex-dev/auth/react";
 import {
   Authenticated,
   AuthLoading,
@@ -7,11 +7,15 @@ import {
   useQuery,
 } from "convex/react";
 import { makeFunctionReference } from "convex/server";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, Navigate, useLocation, useNavigate } from "react-router-dom";
 import type { Doc, Id } from "../../../convex/_generated/dataModel";
 import AgeConfirmationPage from "./AgeConfirmationPage";
 import AuthPage, { type AuthCredentials, type AuthMode } from "./AuthPage";
+import UploadOfferPanel, {
+  type DuplicateChoice,
+  type UploadItem,
+} from "../upload/UploadOfferPanel";
 
 const getCurrentProfile = makeFunctionReference<
   "query",
@@ -33,6 +37,118 @@ const removeWorkspace = makeFunctionReference<
   { workspaceId: Id<"workspaces"> },
   null
 >("workspaces:remove");
+type DocumentSummary = Omit<Doc<"offerDocuments">, "storageId" | "sha256">;
+const listDocuments = makeFunctionReference<
+  "query",
+  { workspaceId: Id<"workspaces"> },
+  DocumentSummary[]
+>("documents:listDocuments");
+const generateUploadUrl = makeFunctionReference<
+  "mutation",
+  { workspaceId: Id<"workspaces"> },
+  string
+>("documents:generateUploadUrl");
+const finalizeUpload = makeFunctionReference<
+  "mutation",
+  {
+    workspaceId: Id<"workspaces">;
+    storageId: Id<"_storage">;
+    fileName: string;
+  },
+  | { status: "created"; documentId: Id<"offerDocuments"> }
+  | { status: "duplicate"; existingDocumentId: Id<"offerDocuments"> }
+  | { status: "rejected"; errorCode: "INVALID_FILE_NAME" }
+>("documents:finalizeUpload");
+const resolveDuplicate = makeFunctionReference<
+  "mutation",
+  {
+    workspaceId: Id<"workspaces">;
+    existingDocumentId: Id<"offerDocuments">;
+    storageId: Id<"_storage">;
+    fileName: string;
+    choice: "replace" | "keep_new" | "cancel";
+  },
+  {
+    status: "created" | "replaced" | "cancelled";
+    documentId: Id<"offerDocuments">;
+  }
+>("documents:resolveDuplicate");
+const retryValidation = makeFunctionReference<
+  "mutation",
+  { documentId: Id<"offerDocuments"> },
+  { status: "scheduled" }
+>("documents:retryValidation");
+const deleteRaw = makeFunctionReference<
+  "mutation",
+  { documentId: Id<"offerDocuments"> },
+  boolean
+>("documents:deleteRaw");
+
+function usePrivatePreviews(documents: DocumentSummary[] | undefined) {
+  const token = useAuthToken();
+  const siteUrl = import.meta.env.VITE_CONVEX_SITE_URL?.replace(/\/$/, "");
+  const [previews, setPreviews] = useState<{
+    urls: Record<string, string>;
+    failed: Set<string>;
+  }>({ urls: {}, failed: new Set() });
+
+  useEffect(() => {
+    const present = (documents ?? []).filter(
+      ({ rawState }) => rawState === "present",
+    );
+    if (!token || !siteUrl || present.length === 0) {
+      return;
+    }
+
+    const controller = new AbortController();
+    const objectUrls: string[] = [];
+    void Promise.all(
+      present.map(async ({ _id }) => {
+        try {
+          const response = await fetch(
+            `${siteUrl}/documents/preview?documentId=${encodeURIComponent(_id)}`,
+            {
+              headers: { Authorization: `Bearer ${token}` },
+              signal: controller.signal,
+            },
+          );
+          if (!response.ok) return [_id, null] as const;
+          const objectUrl = URL.createObjectURL(await response.blob());
+          objectUrls.push(objectUrl);
+          return [_id, objectUrl] as const;
+        } catch {
+          return [_id, null] as const;
+        }
+      }),
+    ).then((entries) => {
+      if (controller.signal.aborted) return;
+      const urls: Record<string, string> = {};
+      const failed = new Set<string>();
+      entries.forEach(([id, url]) => {
+        if (url) urls[id] = url;
+        else failed.add(id);
+      });
+      setPreviews({ urls, failed });
+    });
+
+    return () => {
+      controller.abort();
+      objectUrls.forEach((url) => URL.revokeObjectURL(url));
+    };
+  }, [documents, siteUrl, token]);
+
+  if (!token || !siteUrl) {
+    return {
+      urls: {},
+      failed: new Set(
+        (documents ?? [])
+          .filter(({ rawState }) => rawState === "present")
+          .map(({ _id }) => _id),
+      ),
+    };
+  }
+  return previews;
+}
 
 const PRIVATE_PATH =
   /^\/(workspace|compare|decision|offers\/[^/]+\/review|schools\/[^/]+|questions\/[^/]+\/draft)$/;
@@ -147,13 +263,100 @@ function WorkspacePage() {
   const { signOut } = useAuthActions();
   const workspace = useQuery(getCurrentWorkspace, {});
   const remove = useMutation(removeWorkspace);
+  const documents = useQuery(
+    listDocuments,
+    workspace ? { workspaceId: workspace._id } : "skip",
+  );
+  const createUploadUrl = useMutation(generateUploadUrl);
+  const finalize = useMutation(finalizeUpload);
+  const resolve = useMutation(resolveDuplicate);
+  const retry = useMutation(retryValidation);
+  const removeRaw = useMutation(deleteRaw);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const [duplicate, setDuplicate] = useState<{
+    existingDocumentId: Id<"offerDocuments">;
+    storageId: Id<"_storage">;
+    fileName: string;
+  }>();
+  const previews = usePrivatePreviews(documents);
 
   if (workspace === undefined) return <SessionStatus />;
   if (workspace === null) return <Navigate to="/" replace />;
   const workspaceId = workspace._id;
+
+  async function handleUpload(file: File) {
+    setUploadError(null);
+    const uploadUrl = await createUploadUrl({ workspaceId });
+    const response = await fetch(uploadUrl, {
+      method: "POST",
+      headers: { "Content-Type": file.type },
+      body: file,
+    });
+    if (!response.ok) throw new Error("Upload failed");
+    const payload: unknown = await response.json();
+    if (
+      typeof payload !== "object" ||
+      payload === null ||
+      !("storageId" in payload) ||
+      typeof payload.storageId !== "string"
+    ) {
+      throw new Error("Upload response invalid");
+    }
+    const storageId = payload.storageId as Id<"_storage">;
+    const result = await finalize({
+      workspaceId,
+      storageId,
+      fileName: file.name,
+    });
+    if (result.status === "duplicate") {
+      setDuplicate({
+        existingDocumentId: result.existingDocumentId,
+        storageId,
+        fileName: file.name,
+      });
+    }
+    if (result.status === "rejected") {
+      throw new Error("Upload filename invalid");
+    }
+  }
+
+  async function handleDuplicateChoice(choice: DuplicateChoice) {
+    if (!duplicate) return;
+    await resolve({
+      workspaceId,
+      existingDocumentId: duplicate.existingDocumentId,
+      storageId: duplicate.storageId,
+      fileName: duplicate.fileName,
+      choice: choice === "new-version" ? "keep_new" : choice,
+    });
+    setDuplicate(undefined);
+  }
+
+  const uploadItems: UploadItem[] = (documents ?? []).map((document) => ({
+    id: document._id,
+    filename: document.fileName,
+    mimeType: document.mimeType,
+    sizeBytes: document.byteSize,
+    processingState: document.processingState,
+    updatedAtLabel: new Date(document.updatedAt).toLocaleString(),
+    errorMessage: document.errorMessage,
+    requiredAction:
+      document.processingState === "failed"
+        ? "Correct the file and retry."
+        : undefined,
+    previewState:
+      document.rawState === "present" && !previews.failed.has(document._id)
+        ? "available"
+        : "unavailable",
+    privatePreviewUrl: previews.urls[document._id],
+    rawDeletedAtLabel: document.rawDeletedAt
+      ? `Raw file deleted ${new Date(document.rawDeletedAt).toLocaleString()}`
+      : undefined,
+    rawAvailable: document.rawState === "present",
+  }));
 
   async function handleDelete() {
     setDeleting(true);
@@ -172,10 +375,44 @@ function WorkspacePage() {
     <main id="main" className="workspace-page">
       <h1>Your private workspace</h1>
       <p>{workspace.name}</p>
-      <p>0 of 4 offers added</p>
-      <button type="button" disabled>
-        Upload an offer
-      </button>
+      <p>{documents?.length ?? 0} of 4 offers added</p>
+      {uploadError ? <p role="alert">{uploadError}</p> : null}
+      <UploadOfferPanel
+        uploads={uploadItems}
+        duplicate={
+          duplicate
+            ? {
+                filename: duplicate.fileName,
+                currentOfferName:
+                  documents?.find(
+                    ({ _id }) => _id === duplicate.existingDocumentId,
+                  )?.fileName ?? "matching",
+              }
+            : undefined
+        }
+        onUpload={handleUpload}
+        onDuplicateChoice={(choice) => {
+          void handleDuplicateChoice(choice).catch(() =>
+            setUploadError("We couldn't apply that duplicate choice."),
+          );
+        }}
+        onRetry={async (documentId) => {
+          try {
+            await retry({ documentId: documentId as Id<"offerDocuments"> });
+          } catch {
+            setUploadError("We couldn't retry that file.");
+          }
+        }}
+        onDeleteRaw={async (documentId) => {
+          try {
+            await removeRaw({
+              documentId: documentId as Id<"offerDocuments">,
+            });
+          } catch {
+            setUploadError("We couldn't delete that raw file.");
+          }
+        }}
+      />
       <p>Email forwarding will be available soon.</p>
       <button type="button" onClick={() => void signOut()}>
         Sign out
@@ -185,7 +422,10 @@ function WorkspacePage() {
           Delete workspace
         </button>
       ) : (
-        <section aria-labelledby="delete-workspace-heading">
+        <section
+          className="delete-workspace"
+          aria-labelledby="delete-workspace-heading"
+        >
           <h2 id="delete-workspace-heading">Delete this workspace?</h2>
           <p>This permanently removes its schools and cannot be undone.</p>
           {deleteError ? <p role="alert">{deleteError}</p> : null}

@@ -9,20 +9,34 @@ interface AuthTestState {
   profile: undefined | null | { ageConfirmedAt?: number };
   workspace:
     undefined | null | { _id: string; name: string; generation: number };
+  documents: unknown[] | undefined;
+  token: string | null;
   signIn: ReturnType<typeof vi.fn>;
   signOut: ReturnType<typeof vi.fn>;
   confirmAge: ReturnType<typeof vi.fn>;
   removeWorkspace: ReturnType<typeof vi.fn>;
+  generateUploadUrl: ReturnType<typeof vi.fn>;
+  finalizeUpload: ReturnType<typeof vi.fn>;
+  resolveDuplicate: ReturnType<typeof vi.fn>;
+  retryValidation: ReturnType<typeof vi.fn>;
+  deleteRaw: ReturnType<typeof vi.fn>;
 }
 
 const auth = vi.hoisted((): AuthTestState => ({
   status: "signedOut",
   profile: undefined,
   workspace: undefined,
+  documents: undefined,
+  token: null,
   signIn: vi.fn(),
   signOut: vi.fn(),
   confirmAge: vi.fn(),
   removeWorkspace: vi.fn(),
+  generateUploadUrl: vi.fn(),
+  finalizeUpload: vi.fn(),
+  resolveDuplicate: vi.fn(),
+  retryValidation: vi.fn(),
+  deleteRaw: vi.fn(),
 }));
 
 vi.mock("convex/react", () => ({
@@ -36,20 +50,27 @@ vi.mock("convex/react", () => ({
     const name = Object.getOwnPropertySymbols(reference)
       .map((symbol) => String(Reflect.get(reference, symbol)))
       .join();
-    return name.startsWith("profiles:") ? auth.profile : auth.workspace;
+    if (name.startsWith("profiles:")) return auth.profile;
+    if (name === "workspaces:getCurrent") return auth.workspace;
+    return auth.documents;
   },
   useMutation: (reference: object) => {
     const name = Object.getOwnPropertySymbols(reference)
       .map((symbol) => String(Reflect.get(reference, symbol)))
       .join();
-    return name.startsWith("profiles:")
-      ? auth.confirmAge
-      : auth.removeWorkspace;
+    if (name.startsWith("profiles:")) return auth.confirmAge;
+    if (name === "workspaces:remove") return auth.removeWorkspace;
+    if (name === "documents:generateUploadUrl") return auth.generateUploadUrl;
+    if (name === "documents:finalizeUpload") return auth.finalizeUpload;
+    if (name === "documents:resolveDuplicate") return auth.resolveDuplicate;
+    if (name === "documents:deleteRaw") return auth.deleteRaw;
+    return auth.retryValidation;
   },
 }));
 
 vi.mock("@convex-dev/auth/react", () => ({
   useAuthActions: () => ({ signIn: auth.signIn, signOut: auth.signOut }),
+  useAuthToken: () => auth.token,
 }));
 
 import AccountRoutes from "./AccountRoutes";
@@ -66,13 +87,25 @@ beforeEach(() => {
   auth.status = "signedOut";
   auth.profile = undefined;
   auth.workspace = undefined;
+  auth.documents = undefined;
+  auth.token = null;
   auth.signIn.mockReset();
   auth.signOut.mockReset();
   auth.confirmAge.mockReset();
   auth.removeWorkspace.mockReset();
+  auth.generateUploadUrl.mockReset();
+  auth.finalizeUpload.mockReset();
+  auth.resolveDuplicate.mockReset();
+  auth.retryValidation.mockReset();
+  auth.deleteRaw.mockReset();
 });
 
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  vi.restoreAllMocks();
+  vi.unstubAllEnvs();
+  vi.unstubAllGlobals();
+});
 
 describe("private account routes", () => {
   it("shows only a neutral state while authentication is loading", () => {
@@ -213,5 +246,123 @@ describe("private account routes", () => {
     );
     expect(screen.getByText("My offers")).toBeInTheDocument();
     expect(screen.queryByText("provider detail")).not.toBeInTheDocument();
+  });
+
+  it("uploads a supported offer through the owner-scoped Convex flow", async () => {
+    const user = userEvent.setup();
+    auth.status = "signedIn";
+    auth.profile = { ageConfirmedAt: 1 };
+    auth.workspace = {
+      _id: "workspace-1",
+      name: "My offers",
+      generation: 0,
+    };
+    auth.documents = [];
+    auth.generateUploadUrl.mockResolvedValue("https://upload.example.test");
+    auth.finalizeUpload.mockResolvedValue({
+      status: "created",
+      documentId: "document-1",
+    });
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(JSON.stringify({ storageId: "storage-1" }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      }),
+    );
+
+    renderRoute("/workspace");
+    const file = new File(["%PDF-1.7\n%%EOF"], "award.pdf", {
+      type: "application/pdf",
+    });
+    await user.upload(await screen.findByLabelText("Upload an offer"), file);
+
+    await waitFor(() =>
+      expect(auth.generateUploadUrl).toHaveBeenCalledWith({
+        workspaceId: "workspace-1",
+      }),
+    );
+    expect(globalThis.fetch).toHaveBeenCalledWith(
+      "https://upload.example.test",
+      expect.objectContaining({ method: "POST", body: file }),
+    );
+    expect(auth.finalizeUpload).toHaveBeenCalledWith({
+      workspaceId: "workspace-1",
+      storageId: "storage-1",
+      fileName: "award.pdf",
+    });
+  });
+
+  it("fetches a private preview with the current auth token", async () => {
+    auth.status = "signedIn";
+    auth.profile = { ageConfirmedAt: 1 };
+    auth.workspace = {
+      _id: "workspace-1",
+      name: "My offers",
+      generation: 0,
+    };
+    auth.token = "private-jwt";
+    auth.documents = [
+      {
+        _id: "document-1",
+        fileName: "award.pdf",
+        mimeType: "application/pdf",
+        byteSize: 12,
+        processingState: "extracting",
+        rawState: "present",
+        updatedAt: 1,
+      },
+    ];
+    vi.stubEnv("VITE_CONVEX_SITE_URL", "https://aidlens.convex.site");
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(new Blob(["private"]), { status: 200 }),
+    );
+    vi.stubGlobal("URL", {
+      ...URL,
+      createObjectURL: vi.fn(() => "blob:private-preview"),
+      revokeObjectURL: vi.fn(),
+    });
+
+    renderRoute("/workspace");
+
+    expect(await screen.findByTitle("award.pdf preview")).toHaveAttribute(
+      "src",
+      "blob:private-preview",
+    );
+    expect(globalThis.fetch).toHaveBeenCalledWith(
+      "https://aidlens.convex.site/documents/preview?documentId=document-1",
+      expect.objectContaining({
+        headers: { Authorization: "Bearer private-jwt" },
+      }),
+    );
+  });
+
+  it("deletes an offer's raw file through the owner-scoped mutation", async () => {
+    const user = userEvent.setup();
+    auth.status = "signedIn";
+    auth.profile = { ageConfirmedAt: 1 };
+    auth.workspace = {
+      _id: "workspace-1",
+      name: "My offers",
+      generation: 0,
+    };
+    auth.documents = [
+      {
+        _id: "document-1",
+        fileName: "award.pdf",
+        mimeType: "application/pdf",
+        byteSize: 12,
+        processingState: "extracting",
+        rawState: "present",
+        updatedAt: 1,
+      },
+    ];
+    auth.deleteRaw.mockResolvedValue(true);
+
+    renderRoute("/workspace");
+    await user.click(
+      await screen.findByRole("button", { name: "Delete raw award.pdf" }),
+    );
+
+    expect(auth.deleteRaw).toHaveBeenCalledWith({ documentId: "document-1" });
   });
 });

@@ -1,11 +1,24 @@
+import { makeFunctionReference } from "convex/server";
 import { v } from "convex/values";
-import { internalQuery, mutation, query } from "./_generated/server";
+import type { Id } from "./_generated/dataModel";
+import {
+  internalMutation,
+  internalQuery,
+  mutation,
+  query,
+} from "./_generated/server";
 import {
   getActiveWorkspaceForGeneration,
   NOT_FOUND,
   requireActiveWorkspace,
   requireProfile,
 } from "./lib/auth";
+
+const continueRemovalRef = makeFunctionReference<
+  "mutation",
+  { workspaceId: Id<"workspaces">; generation: number }
+>("workspaces:continueRemoval");
+const DELETE_BATCH_SIZE = 50;
 
 export const getCurrent = query({
   args: {},
@@ -60,16 +73,82 @@ export const remove = mutation({
       agentMailInboxAddress: undefined,
       updatedAt: now,
     });
+    await ctx.scheduler.runAfter(0, continueRemovalRef, {
+      workspaceId,
+      generation: workspace.generation + 1,
+    });
+  },
+});
+
+export const continueRemoval = internalMutation({
+  args: {
+    workspaceId: v.id("workspaces"),
+    generation: v.number(),
+  },
+  handler: async (ctx, { workspaceId, generation }) => {
+    const workspace = await ctx.db.get("workspaces", workspaceId);
+    if (
+      !workspace ||
+      workspace.status !== "deleting" ||
+      workspace.generation !== generation
+    ) {
+      return false;
+    }
+
+    const audits = await ctx.db
+      .query("auditEvents")
+      .withIndex("by_workspaceId_createdAt", (query) =>
+        query.eq("workspaceId", workspaceId),
+      )
+      .take(DELETE_BATCH_SIZE);
+    if (audits.length) {
+      await Promise.all(
+        audits.map(({ _id }) => ctx.db.delete("auditEvents", _id)),
+      );
+      await ctx.scheduler.runAfter(0, continueRemovalRef, {
+        workspaceId,
+        generation,
+      });
+      return false;
+    }
+
+    const documents = await ctx.db
+      .query("offerDocuments")
+      .withIndex("by_workspaceId", (query) =>
+        query.eq("workspaceId", workspaceId),
+      )
+      .take(DELETE_BATCH_SIZE);
+    if (documents.length) {
+      for (const document of documents) {
+        if (document.storageId) await ctx.storage.delete(document.storageId);
+        await ctx.db.delete("offerDocuments", document._id);
+      }
+      await ctx.scheduler.runAfter(0, continueRemovalRef, {
+        workspaceId,
+        generation,
+      });
+      return false;
+    }
+
     const schools = await ctx.db
       .query("schools")
       .withIndex("by_workspaceId", (query) =>
         query.eq("workspaceId", workspaceId),
       )
-      .collect();
-    await Promise.all(
-      schools.map((school) => ctx.db.delete("schools", school._id)),
-    );
+      .take(DELETE_BATCH_SIZE);
+    if (schools.length) {
+      await Promise.all(
+        schools.map(({ _id }) => ctx.db.delete("schools", _id)),
+      );
+      await ctx.scheduler.runAfter(0, continueRemovalRef, {
+        workspaceId,
+        generation,
+      });
+      return false;
+    }
+
     await ctx.db.delete("workspaces", workspaceId);
+    return true;
   },
 });
 
