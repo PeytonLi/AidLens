@@ -314,7 +314,10 @@ describe("private account routes", () => {
     ];
     vi.stubEnv("VITE_CONVEX_SITE_URL", "https://aidlens.convex.site");
     vi.spyOn(globalThis, "fetch").mockResolvedValue(
-      new Response(new Blob(["private"]), { status: 200 }),
+      new Response("private", {
+        status: 200,
+        headers: { "Content-Type": "application/pdf" },
+      }),
     );
     vi.stubGlobal("URL", {
       ...URL,
