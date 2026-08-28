@@ -328,6 +328,187 @@ a:focus-visible,
   }
 }
 
+/* Account and workspace */
+
+.auth-page,
+.age-page,
+.workspace-page,
+.status-page,
+.not-found-page {
+  flex: 1;
+  width: min(100% - 2rem, 34rem);
+  margin: 0 auto;
+  padding: var(--space-7) 0;
+}
+
+.auth-page h1,
+.age-page h1,
+.workspace-page h1,
+.not-found-page h1 {
+  margin: 0 0 var(--space-3);
+  font-size: clamp(1.75rem, 5vw, 2.25rem);
+  line-height: 1.15;
+  letter-spacing: -0.035em;
+}
+
+.auth-page form,
+.age-page form,
+.workspace-page,
+.not-found-page {
+  padding: var(--space-5);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  box-shadow: 0 1rem 3rem rgb(15 31 23 / 6%);
+}
+
+.auth-page form,
+.age-page form {
+  display: grid;
+  gap: var(--space-3);
+  margin: var(--space-5) 0;
+}
+
+.auth-page label,
+.age-page label {
+  font-weight: 650;
+}
+
+.auth-page input[type="email"],
+.auth-page input[type="password"],
+.auth-page input[type="text"] {
+  width: 100%;
+  min-height: 2.75rem;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: 2px;
+  background: white;
+  color: var(--color-ink);
+  font: inherit;
+}
+
+.auth-page input[aria-invalid="true"],
+.age-page input[aria-invalid="true"] {
+  border-color: var(--color-danger);
+  outline-color: var(--color-danger);
+}
+
+.auth-page button,
+.age-page button,
+.workspace-page button {
+  min-height: 2.75rem;
+  padding: 0.65rem 1rem;
+  border: 1px solid var(--color-border);
+  border-radius: 2px;
+  background: var(--color-surface);
+  color: var(--color-ink);
+  font: inherit;
+  font-weight: 650;
+  cursor: pointer;
+}
+
+.auth-page form button[type="submit"],
+.age-page form button[type="submit"] {
+  border-color: var(--color-brand);
+  background: var(--color-brand);
+  color: white;
+}
+
+.auth-page button:hover:not(:disabled),
+.age-page button:hover:not(:disabled),
+.workspace-page button:hover:not(:disabled) {
+  border-color: var(--color-brand);
+  background: var(--color-brand-soft);
+  color: var(--color-ink);
+}
+
+.auth-page button:focus-visible,
+.age-page button:focus-visible,
+.workspace-page button:focus-visible,
+.auth-page input:focus-visible,
+.age-page input:focus-visible {
+  outline: 2px solid var(--color-brand);
+  outline-offset: 2px;
+}
+
+.auth-page button:disabled,
+.age-page button:disabled,
+.workspace-page button:disabled {
+  cursor: not-allowed;
+  opacity: 0.58;
+}
+
+.auth-page [role="alert"],
+.age-page [role="alert"],
+.workspace-page [role="alert"] {
+  margin: 0;
+  padding: var(--space-3);
+  border-left: 3px solid var(--color-danger);
+  background: color-mix(in srgb, var(--color-danger) 8%, white);
+  color: var(--color-danger);
+}
+
+.auth-page form > p,
+.age-page form > p {
+  margin: 0;
+}
+
+.age-page label {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+}
+
+.age-page input[type="checkbox"] {
+  width: 1.2rem;
+  height: 1.2rem;
+  margin-top: 0.15rem;
+  accent-color: var(--color-brand);
+}
+
+.workspace-page {
+  display: grid;
+  align-content: start;
+  gap: var(--space-4);
+}
+
+.workspace-page > p {
+  margin: 0;
+  color: var(--color-ink-muted);
+}
+
+.workspace-page > button {
+  width: fit-content;
+}
+
+.workspace-page > button:last-of-type {
+  border-color: color-mix(
+    in srgb,
+    var(--color-danger) 55%,
+    var(--color-border)
+  );
+  color: var(--color-danger);
+}
+
+.workspace-page section {
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--color-border);
+}
+
+.workspace-page section h2 {
+  margin: 0 0 var(--space-2);
+  font-size: 1.125rem;
+}
+
+.workspace-page section button {
+  margin: var(--space-3) var(--space-3) 0 0;
+}
+
+.workspace-page section button:first-of-type {
+  border-color: var(--color-danger);
+  background: var(--color-danger);
+  color: white;
+}
+
 /* —— Sample comparison (Slice 2) —— */
 
 .sr-only {

@@ -34,17 +34,19 @@ Runs format check, typecheck, lint, unit/behavior tests, and production build.
 
 Useful scripts:
 
-| Command            | Purpose                      |
-| ------------------ | ---------------------------- |
-| `pnpm test:react`  | React behavior tests (jsdom) |
-| `pnpm test:domain` | Pure domain tests (Node)     |
-| `pnpm typecheck`   | TypeScript                   |
-| `pnpm lint`        | ESLint                       |
-| `pnpm build`       | Production frontend build    |
+| Command            | Purpose                             |
+| ------------------ | ----------------------------------- |
+| `pnpm test:react`  | React behavior tests (jsdom)        |
+| `pnpm test:domain` | Pure domain tests (Node)            |
+| `pnpm test:convex` | Convex authorization/database tests |
+| `pnpm e2e`         | Chromium journeys and axe checks    |
+| `pnpm typecheck`   | TypeScript                          |
+| `pnpm lint`        | ESLint                              |
+| `pnpm build`       | Production frontend build           |
 
-## Deploy (Slice 0 shell)
+## Deploy
 
-Live deploy is optional for local Slice 0 work. When you are ready to publish the public shell:
+When you are ready to publish AidLens:
 
 1. Ensure Convex Auth and site hosting are configured for this project.
 2. Set dashboard environment variables from `.env.example` (vendor keys later).

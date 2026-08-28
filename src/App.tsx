@@ -1,5 +1,6 @@
-import { Link, Navigate, Route, Routes } from "react-router-dom";
+import { Link, Route, Routes } from "react-router-dom";
 import type { ReactNode } from "react";
+import AccountRoutes from "./features/auth/AccountRoutes";
 import SamplePage from "./features/sample/SamplePage";
 
 function LandingPage() {
@@ -89,16 +90,26 @@ function AppShell({ children }: { children: ReactNode }) {
             Every number links back to the offer, an official school page, or a
             school reply.
           </p>
-          <p className="privacy-line">
+          <p id="privacy" className="privacy-line">
             Your offers stay in your private workspace. AidLens never sells your
             data or recommends a school.
           </p>
-          <p className="sponsors">
+          <p id="service-providers" className="sponsors">
             Built with Convex · OpenAI · Firecrawl · AgentMail
           </p>
         </div>
       </footer>
     </div>
+  );
+}
+
+function NotFoundPage() {
+  return (
+    <main id="main" className="not-found-page">
+      <h1>Not found</h1>
+      <p>That AidLens page does not exist.</p>
+      <Link to="/">Return home</Link>
+    </main>
   );
 }
 
@@ -108,7 +119,18 @@ export default function App() {
       <Routes>
         <Route path="/" element={<LandingPage />} />
         <Route path="/sample" element={<SamplePage />} />
-        <Route path="*" element={<Navigate to="/" replace />} />
+        <Route path="/auth" element={<AccountRoutes />} />
+        <Route path="/age" element={<AccountRoutes />} />
+        <Route path="/workspace" element={<AccountRoutes />} />
+        <Route path="/offers/:offerId/review" element={<AccountRoutes />} />
+        <Route path="/compare" element={<AccountRoutes />} />
+        <Route path="/schools/:schoolId" element={<AccountRoutes />} />
+        <Route
+          path="/questions/:questionId/draft"
+          element={<AccountRoutes />}
+        />
+        <Route path="/decision" element={<AccountRoutes />} />
+        <Route path="*" element={<NotFoundPage />} />
       </Routes>
     </AppShell>
   );

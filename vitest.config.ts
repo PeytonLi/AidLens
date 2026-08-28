@@ -20,6 +20,13 @@ export default defineConfig({
           setupFiles: ["./src/test/setup.ts"],
         },
       },
+      {
+        test: {
+          name: "convex",
+          include: ["convex/**/*.test.ts"],
+          environment: "node",
+        },
+      },
     ],
     coverage: {
       provider: "v8",
