@@ -17,6 +17,33 @@ const getPreviewFile = makeFunctionReference<
   }
 >("documents:getPreviewFile");
 
+function corsHeaders(request: Request): Record<string, string> {
+  const origin = request.headers.get("Origin");
+  return origin && origin === process.env.SITE_URL
+    ? { "Access-Control-Allow-Origin": origin, Vary: "Origin" }
+    : {};
+}
+
+http.route({
+  path: "/documents/preview",
+  method: "OPTIONS",
+  handler: httpAction(async (_, request) => {
+    const headers = corsHeaders(request);
+    if (!("Access-Control-Allow-Origin" in headers)) {
+      return new Response(null, { status: 403 });
+    }
+    return new Response(null, {
+      status: 204,
+      headers: {
+        ...headers,
+        "Access-Control-Allow-Headers": "Authorization",
+        "Access-Control-Allow-Methods": "GET",
+        "Access-Control-Max-Age": "86400",
+      },
+    });
+  }),
+});
+
 http.route({
   path: "/documents/preview",
   method: "GET",
@@ -34,6 +61,7 @@ http.route({
       if (!blob) return new Response("Not found", { status: 404 });
       return new Response(blob, {
         headers: {
+          ...corsHeaders(request),
           "Cache-Control": "private, no-store",
           "Content-Type": preview.mimeType,
           "X-Content-Type-Options": "nosniff",

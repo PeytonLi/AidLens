@@ -81,7 +81,6 @@ export default defineSchema({
     rawDeletedAt: v.optional(v.number()),
   })
     .index("by_workspaceId", ["workspaceId"])
-    .index("by_storageId", ["storageId"])
     .index("by_schoolId_createdAt", ["schoolId", "createdAt"])
     .index("by_workspaceId_sha256", ["workspaceId", "sha256"])
     .index("by_rawState_retentionDeadline", ["rawState", "retentionDeadline"])

@@ -1,6 +1,6 @@
 import { convexTest } from "convex-test";
 import { makeFunctionReference } from "convex/server";
-import { expect, test } from "vitest";
+import { expect, test, vi } from "vitest";
 import type { Id } from "./_generated/dataModel";
 import schema from "./schema";
 
@@ -95,4 +95,31 @@ test("deleted or missing raw documents have the same preview response", async ()
   expect([deleted.status, missing.status]).toEqual([404, 404]);
   await expect(deleted.text()).resolves.toBe("Not found");
   await expect(missing.text()).resolves.toBe("Not found");
+});
+
+test("preview preflight allows only the configured browser origin and authorization header", async () => {
+  vi.stubEnv("SITE_URL", "http://localhost:5173");
+  const t = createTest();
+  const allowed = await t.fetch("/documents/preview", {
+    method: "OPTIONS",
+    headers: {
+      Origin: "http://localhost:5173",
+      "Access-Control-Request-Method": "GET",
+      "Access-Control-Request-Headers": "authorization",
+    },
+  });
+  expect(allowed.status).toBe(204);
+  expect(allowed.headers.get("access-control-allow-origin")).toBe(
+    "http://localhost:5173",
+  );
+  expect(allowed.headers.get("access-control-allow-headers")).toContain(
+    "Authorization",
+  );
+
+  const rejected = await t.fetch("/documents/preview", {
+    method: "OPTIONS",
+    headers: { Origin: "https://attacker.example" },
+  });
+  expect(rejected.status).toBe(403);
+  expect(rejected.headers.has("access-control-allow-origin")).toBe(false);
 });

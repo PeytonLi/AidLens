@@ -5,6 +5,6 @@ const cleanupDue = makeFunctionReference<"mutation", { limit?: number }>(
 );
 const crons = cronJobs();
 
-crons.hourly("delete expired raw documents", {}, cleanupDue, {});
+crons.interval("delete expired raw documents", { hours: 1 }, cleanupDue, {});
 
 export default crons;

@@ -9,8 +9,15 @@
  */
 
 import type * as auth from "../auth.js";
+import type * as crons from "../crons.js";
+import type * as documents from "../documents.js";
 import type * as http from "../http.js";
+import type * as lib_auth from "../lib/auth.js";
+import type * as lib_fileValidation from "../lib/fileValidation.js";
 import type * as myFunctions from "../myFunctions.js";
+import type * as profiles from "../profiles.js";
+import type * as retention from "../retention.js";
+import type * as workspaces from "../workspaces.js";
 
 import type {
   ApiFromModules,
@@ -20,8 +27,15 @@ import type {
 
 declare const fullApi: ApiFromModules<{
   auth: typeof auth;
+  crons: typeof crons;
+  documents: typeof documents;
   http: typeof http;
+  "lib/auth": typeof lib_auth;
+  "lib/fileValidation": typeof lib_fileValidation;
   myFunctions: typeof myFunctions;
+  profiles: typeof profiles;
+  retention: typeof retention;
+  workspaces: typeof workspaces;
 }>;
 
 /**

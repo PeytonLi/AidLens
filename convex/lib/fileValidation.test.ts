@@ -11,7 +11,11 @@ function pdfOfSize(size: number, type = "application/pdf") {
   const start = new TextEncoder().encode("%PDF-1.7\n");
   const end = new TextEncoder().encode("\n%%EOF");
   return new Blob(
-    [start, new Uint8Array(size - start.length - end.length), end],
+    [
+      start.buffer,
+      new ArrayBuffer(size - start.length - end.length),
+      end.buffer,
+    ],
     {
       type,
     },
@@ -25,7 +29,11 @@ function imageOfSize(
   type: string,
 ) {
   return new Blob(
-    [start, new Uint8Array(size - start.length - end.length), end],
+    [
+      start.buffer as ArrayBuffer,
+      new ArrayBuffer(size - start.length - end.length),
+      end.buffer as ArrayBuffer,
+    ],
     { type },
   );
 }

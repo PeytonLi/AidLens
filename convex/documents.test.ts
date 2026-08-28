@@ -1,7 +1,7 @@
 import { convexTest } from "convex-test";
 import { makeFunctionReference } from "convex/server";
 import { expect, test, vi } from "vitest";
-import type { Id } from "./_generated/dataModel";
+import type { Doc, Id } from "./_generated/dataModel";
 import schema from "./schema";
 
 const modules = import.meta.glob("./**/*.ts");
@@ -31,13 +31,24 @@ const finalizeUpload = makeFunctionReference<
   },
   { status: "created"; documentId: Id<"offerDocuments"> }
 >("documents:finalizeUpload");
+const finalizeUploadWithDuplicate = makeFunctionReference<
+  "mutation",
+  {
+    workspaceId: Id<"workspaces">;
+    storageId: Id<"_storage">;
+    fileName: string;
+  },
+  | { status: "created"; documentId: Id<"offerDocuments"> }
+  | { status: "duplicate"; existingDocumentId: Id<"offerDocuments"> }
+>("documents:finalizeUpload");
 const getDocument = makeFunctionReference<
   "query",
   { documentId: Id<"offerDocuments"> }
 >("documents:getDocument");
 const listDocuments = makeFunctionReference<
   "query",
-  { workspaceId: Id<"workspaces"> }
+  { workspaceId: Id<"workspaces"> },
+  Array<Omit<Doc<"offerDocuments">, "storageId" | "sha256">>
 >("documents:listDocuments");
 const resolveDuplicate = makeFunctionReference<
   "mutation",
@@ -146,7 +157,7 @@ test("finalization rejects an unsafe filename at the trust boundary", async () =
   );
 
   await expect(
-    alice.mutation(finalizeUpload, {
+    alice.mutation(finalizeUploadWithDuplicate, {
       workspaceId,
       storageId,
       fileName: `offer\u0000${"x".repeat(256)}.pdf`,
@@ -175,7 +186,7 @@ test("concurrent duplicate finalization creates one document and one validation 
   );
 
   const results = await Promise.all([
-    alice.mutation(finalizeUpload, {
+    alice.mutation(finalizeUploadWithDuplicate, {
       workspaceId,
       storageId: firstStorageId,
       fileName: "first.pdf",
@@ -501,7 +512,7 @@ test("retention cleanup deletes only a bounded due batch and audits each deletio
     const { workspaceId } = await alice.mutation(confirmAge, {
       confirmed: true,
     });
-    const created = [];
+    const created: Array<{ storageId: Id<"_storage"> }> = [];
     for (const [index, deadline] of [
       Date.now() - 3,
       Date.now() - 2,

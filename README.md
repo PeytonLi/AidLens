@@ -14,7 +14,7 @@ pnpm install
 cp .env.example .env.local
 ```
 
-Set `VITE_CONVEX_URL` to your Convex deployment URL (from `pnpm dev` / the Convex dashboard). Vendor API keys belong in the Convex environment, not in Vite env files.
+Set `VITE_CONVEX_URL` and `VITE_CONVEX_SITE_URL` from `pnpm dev` or the Convex dashboard. Vendor API keys belong in the Convex environment, not in Vite env files.
 
 ## Develop
 
@@ -34,15 +34,18 @@ Runs format check, typecheck, lint, unit/behavior tests, and production build.
 
 Useful scripts:
 
-| Command            | Purpose                             |
-| ------------------ | ----------------------------------- |
-| `pnpm test:react`  | React behavior tests (jsdom)        |
-| `pnpm test:domain` | Pure domain tests (Node)            |
-| `pnpm test:convex` | Convex authorization/database tests |
-| `pnpm e2e`         | Chromium journeys and axe checks    |
-| `pnpm typecheck`   | TypeScript                          |
-| `pnpm lint`        | ESLint                              |
-| `pnpm build`       | Production frontend build           |
+| Command             | Purpose                             |
+| ------------------- | ----------------------------------- |
+| `pnpm test:react`   | React behavior tests (jsdom)        |
+| `pnpm test:domain`  | Pure domain tests (Node)            |
+| `pnpm test:convex`  | Convex authorization/database tests |
+| `pnpm e2e`          | Chromium journeys and axe checks    |
+| `pnpm smoke:convex` | Disposable live dev ingestion flow  |
+| `pnpm typecheck`    | TypeScript                          |
+| `pnpm lint`         | ESLint                              |
+| `pnpm build`        | Production frontend build           |
+
+`pnpm smoke:convex` requires a configured development deployment and Convex Auth. It creates only synthetic data and deletes its workspace before finishing; it is not part of pull-request CI.
 
 ## Deploy
 
