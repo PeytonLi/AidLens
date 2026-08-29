@@ -226,6 +226,50 @@ export const approveDraft = mutation({
       throw new Error("STALE_REVISION");
     if (draft.status === "queued" && draft.approvalId && draft.approvedBodyHash)
       return { approvalId: draft.approvalId, bodyHash: draft.approvedBodyHash };
+    if (
+      draft.status === "failed" &&
+      draft.approvalId &&
+      draft.approvedBodyHash
+    ) {
+      const [question, message, bodyHash] = await Promise.all([
+        ctx.db.get("questions", draft.questionId),
+        ctx.db
+          .query("mailMessages")
+          .withIndex("by_approvalId", (query) =>
+            query.eq("approvalId", draft.approvalId),
+          )
+          .unique(),
+        sha256(`${draft.recipient}\n${draft.subject}\n${draft.bodyText}`),
+      ]);
+      if (
+        !question ||
+        question.workspaceId !== workspace._id ||
+        !message ||
+        message.workspaceId !== workspace._id ||
+        bodyHash !== draft.approvedBodyHash
+      )
+        throw new Error(NOT_FOUND);
+      const now = Date.now();
+      await ctx.db.patch("mailDrafts", draft._id, {
+        status: "queued",
+        updatedAt: now,
+      });
+      await ctx.db.patch("mailMessages", message._id, {
+        deliveryState: "queued",
+        updatedAt: now,
+      });
+      await ctx.db.patch("questions", question._id, {
+        state: "queued",
+        revision: question.revision + 1,
+        updatedAt: now,
+      });
+      await ctx.scheduler.runAfter(0, sendApproved, {
+        approvalId: draft.approvalId,
+        workspaceId: workspace._id,
+        workspaceGeneration: workspace.generation,
+      });
+      return { approvalId: draft.approvalId, bodyHash };
+    }
     if (draft.status !== "draft") throw new Error(NOT_FOUND);
     const question = await ctx.db.get("questions", draft.questionId);
     const school = question

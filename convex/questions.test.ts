@@ -249,6 +249,32 @@ it("S8.7-S8.12: editing never sends and exact approval queues once", async () =>
     },
     message: { deliveryState: "failed" },
   });
+  const retried = await owner.mutation(approveDraft, {
+    draftId: opened._id,
+    expectedRevision: 2,
+    offDomainConfirmed: false,
+  });
+  await expect(
+    owner.mutation(approveDraft, {
+      draftId: opened._id,
+      expectedRevision: 2,
+      offDomainConfirmed: false,
+    }),
+  ).resolves.toEqual(retried);
+  await expect(
+    t.run(async (ctx) => ({
+      messages: await ctx.db
+        .query("mailMessages")
+        .withIndex("by_workspaceId", (query) =>
+          query.eq("workspaceId", ids.workspaceId),
+        )
+        .take(2),
+      draft: await ctx.db.get("mailDrafts", opened._id),
+    })),
+  ).resolves.toMatchObject({
+    messages: [{ deliveryState: "queued" }],
+    draft: { status: "queued", approvalId: approved.approvalId },
+  });
 
   await t.run(async (ctx) => {
     const question = await ctx.db.get("questions", ids.questionId);

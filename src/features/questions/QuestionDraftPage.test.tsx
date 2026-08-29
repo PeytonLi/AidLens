@@ -109,3 +109,36 @@ it("S8.17-S8.21: shows reply evidence and confirms an edited proposal explicitly
     renewal: { kind: "fixed", durationYears: 4 },
   });
 });
+
+it("S8.15: retries a failed approved payload only after an explicit click", async () => {
+  const user = userEvent.setup();
+  const approve = vi.fn().mockResolvedValue({ approvalId: "approval-1" });
+  render(
+    <QuestionDraftPage
+      data={{
+        question: { prompt: "Is it renewable?" },
+        school: { name: "Example University", officialDomain: "example.edu" },
+        draft: {
+          _id: "draft-1",
+          recipient: "counselor@example.net",
+          subject: "Renewal",
+          bodyText: "Is it renewable?",
+          status: "failed",
+          revision: 2,
+        },
+      }}
+      onOpen={vi.fn()}
+      onSave={vi.fn()}
+      onApprove={approve}
+    />,
+  );
+
+  expect(approve).not.toHaveBeenCalled();
+  await user.click(
+    screen.getByRole("button", { name: "Retry approved email" }),
+  );
+  expect(approve).toHaveBeenCalledWith({
+    expectedRevision: 2,
+    offDomainConfirmed: false,
+  });
+});

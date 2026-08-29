@@ -119,7 +119,7 @@ export default function QuestionDraftPage({
       setError("Save this draft before approving it.");
       return;
     }
-    if (offDomain && !offDomainConfirmed) {
+    if (data.draft?.status === "draft" && offDomain && !offDomainConfirmed) {
       setShowRecipientWarning(true);
       return;
     }
@@ -169,10 +169,12 @@ export default function QuestionDraftPage({
       </button>
       <button
         type="button"
-        disabled={busy || data.draft.status !== "draft"}
+        disabled={busy || !["draft", "failed"].includes(data.draft.status)}
         onClick={() => void approve()}
       >
-        Approve and queue email
+        {data.draft.status === "failed"
+          ? "Retry approved email"
+          : "Approve and queue email"}
       </button>
       {showRecipientWarning ? (
         <label>
