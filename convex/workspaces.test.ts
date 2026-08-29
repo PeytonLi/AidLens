@@ -259,34 +259,75 @@ test("only an owner can choose a school and deletion cascades private children",
     }),
   ).rejects.toHaveProperty("message", "Not found");
 
-  const { storageId, documentId, auditId } = await t.run(async (ctx) => {
-    const now = Date.now();
-    const storageId = await ctx.storage.store(new Blob(["private offer"]));
-    const documentId = await ctx.db.insert("offerDocuments", {
-      workspaceId: aliceIds.workspaceId,
-      schoolId: aliceSchoolId,
-      storageId,
-      fileName: "offer.pdf",
-      mimeType: "application/pdf",
-      byteSize: 13,
-      sha256: "workspace-delete-fixture",
-      sourceRoute: "upload",
-      retentionDeadline: now + 60_000,
-      rawState: "present",
-      processingState: "received",
-      processingGeneration: 0,
-      createdAt: now,
-      updatedAt: now,
-    });
-    const auditId = await ctx.db.insert("auditEvents", {
-      workspaceId: aliceIds.workspaceId,
-      actor: "system",
-      eventType: "fixture",
-      documentId,
-      createdAt: now,
-    });
-    return { storageId, documentId, auditId };
-  });
+  const { storageId, documentId, offerId, lineItemId, auditId } = await t.run(
+    async (ctx) => {
+      const now = Date.now();
+      const storageId = await ctx.storage.store(new Blob(["private offer"]));
+      const documentId = await ctx.db.insert("offerDocuments", {
+        workspaceId: aliceIds.workspaceId,
+        schoolId: aliceSchoolId,
+        storageId,
+        fileName: "offer.pdf",
+        mimeType: "application/pdf",
+        byteSize: 13,
+        sha256: "workspace-delete-fixture",
+        sourceRoute: "upload",
+        retentionDeadline: now + 60_000,
+        rawState: "present",
+        processingState: "received",
+        processingGeneration: 0,
+        createdAt: now,
+        updatedAt: now,
+      });
+      const auditId = await ctx.db.insert("auditEvents", {
+        workspaceId: aliceIds.workspaceId,
+        actor: "system",
+        eventType: "fixture",
+        documentId,
+        createdAt: now,
+      });
+      const offerId = await ctx.db.insert("offers", {
+        workspaceId: aliceIds.workspaceId,
+        schoolId: aliceSchoolId,
+        documentId,
+        version: 1,
+        active: true,
+        reviewState: "preliminary",
+        academicYear: "2026-2027",
+        startTerm: "Fall 2026",
+        endTerm: "Spring 2027",
+        enrollmentIntensity: "full_time",
+        housingAssumption: "unknown",
+        residencyAssumption: "unknown",
+        overallConfidence: 0.8,
+        revision: 0,
+        createdAt: now,
+        updatedAt: now,
+      });
+      const lineItemId = await ctx.db.insert("lineItems", {
+        workspaceId: aliceIds.workspaceId,
+        offerId,
+        originalLabel: "Grant",
+        canonicalCategory: "grant",
+        extractedAmountCents: 100,
+        extractedPeriod: "annual",
+        extractedStatus: "offered",
+        extractedRenewal: { kind: "unknown" },
+        extractedConfidence: 0.8,
+        amountCents: 100,
+        period: "annual",
+        status: "offered",
+        renewal: { kind: "unknown" },
+        requiredForCostTotal: false,
+        documentPage: 1,
+        sourceExcerpt: "Grant $1",
+        revision: 0,
+        createdAt: now,
+        updatedAt: now,
+      });
+      return { storageId, documentId, offerId, lineItemId, auditId };
+    },
+  );
 
   await alice.mutation(remove, { workspaceId: aliceIds.workspaceId });
   await t.finishAllScheduledFunctions(() => {});
@@ -298,6 +339,12 @@ test("only an owner can choose a school and deletion cascades private children",
   ).resolves.toBeNull();
   await expect(
     t.run((ctx) => ctx.db.get("auditEvents", auditId)),
+  ).resolves.toBeNull();
+  await expect(
+    t.run((ctx) => ctx.db.get("offers", offerId)),
+  ).resolves.toBeNull();
+  await expect(
+    t.run((ctx) => ctx.db.get("lineItems", lineItemId)),
   ).resolves.toBeNull();
   await expect(t.run((ctx) => ctx.storage.get(storageId))).resolves.toBeNull();
 });

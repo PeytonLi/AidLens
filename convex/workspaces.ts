@@ -95,6 +95,38 @@ export const continueRemoval = internalMutation({
       return false;
     }
 
+    const lineItems = await ctx.db
+      .query("lineItems")
+      .withIndex("by_workspaceId", (query) =>
+        query.eq("workspaceId", workspaceId),
+      )
+      .take(DELETE_BATCH_SIZE);
+    if (lineItems.length) {
+      await Promise.all(
+        lineItems.map(({ _id }) => ctx.db.delete("lineItems", _id)),
+      );
+      await ctx.scheduler.runAfter(0, continueRemovalRef, {
+        workspaceId,
+        generation,
+      });
+      return false;
+    }
+
+    const offers = await ctx.db
+      .query("offers")
+      .withIndex("by_workspaceId", (query) =>
+        query.eq("workspaceId", workspaceId),
+      )
+      .take(DELETE_BATCH_SIZE);
+    if (offers.length) {
+      await Promise.all(offers.map(({ _id }) => ctx.db.delete("offers", _id)));
+      await ctx.scheduler.runAfter(0, continueRemovalRef, {
+        workspaceId,
+        generation,
+      });
+      return false;
+    }
+
     const audits = await ctx.db
       .query("auditEvents")
       .withIndex("by_workspaceId_createdAt", (query) =>
