@@ -109,3 +109,22 @@ export async function requestFireworksExtraction(
     throw new Error("FIREWORKS_INVALID_JSON");
   }
 }
+
+export async function requestFireworksExtractionWithRetry(
+  input: Parameters<typeof requestFireworksExtraction>[0],
+  fetcher: typeof fetch = fetch,
+): Promise<ExtractionResultV1> {
+  try {
+    return await requestFireworksExtraction(input, fetcher);
+  } catch (error) {
+    if (
+      !(error instanceof Error) ||
+      !["FIREWORKS_INVALID_JSON", "FIREWORKS_INVALID_RESPONSE"].includes(
+        error.message,
+      )
+    ) {
+      throw error;
+    }
+    return await requestFireworksExtraction(input, fetcher);
+  }
+}

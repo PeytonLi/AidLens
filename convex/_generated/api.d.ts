@@ -15,6 +15,7 @@ import type * as extractions from "../extractions.js";
 import type * as fireworks from "../fireworks.js";
 import type * as http from "../http.js";
 import type * as lib_auth from "../lib/auth.js";
+import type * as lib_extractionPipeline from "../lib/extractionPipeline.js";
 import type * as lib_fileValidation from "../lib/fileValidation.js";
 import type * as lib_fireworks from "../lib/fireworks.js";
 import type * as lib_pdfRendering from "../lib/pdfRendering.js";
@@ -37,6 +38,7 @@ declare const fullApi: ApiFromModules<{
   fireworks: typeof fireworks;
   http: typeof http;
   "lib/auth": typeof lib_auth;
+  "lib/extractionPipeline": typeof lib_extractionPipeline;
   "lib/fileValidation": typeof lib_fileValidation;
   "lib/fireworks": typeof lib_fireworks;
   "lib/pdfRendering": typeof lib_pdfRendering;

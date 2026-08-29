@@ -1,5 +1,7 @@
+import { makeFunctionReference } from "convex/server";
 import { v } from "convex/values";
-import { internalMutation } from "./_generated/server";
+import type { Id } from "./_generated/dataModel";
+import { internalMutation, internalQuery } from "./_generated/server";
 import { getActiveWorkspaceForGeneration } from "./lib/auth";
 import { parseExtractionResultV1 } from "../src/domain/extraction";
 
@@ -68,6 +70,116 @@ const extractionResult = v.object({
       }),
     ),
   }),
+});
+
+const sourceArgs = {
+  workspaceId: v.id("workspaces"),
+  workspaceGeneration: v.number(),
+  documentId: v.id("offerDocuments"),
+  processingGeneration: v.number(),
+};
+type SourceArgs = {
+  workspaceId: Id<"workspaces">;
+  workspaceGeneration: number;
+  documentId: Id<"offerDocuments">;
+  processingGeneration: number;
+};
+const extractDocumentRef = makeFunctionReference<
+  "action",
+  SourceArgs & { attempt: number }
+>("fireworks:extractDocument");
+
+export const getSource = internalQuery({
+  args: sourceArgs,
+  returns: v.union(
+    v.object({
+      storageId: v.id("_storage"),
+      mimeType: v.union(
+        v.literal("application/pdf"),
+        v.literal("image/jpeg"),
+        v.literal("image/png"),
+      ),
+    }),
+    v.null(),
+  ),
+  handler: async (ctx, args) => {
+    if (
+      !(await getActiveWorkspaceForGeneration(
+        ctx,
+        args.workspaceId,
+        args.workspaceGeneration,
+      ))
+    ) {
+      return null;
+    }
+    const document = await ctx.db.get("offerDocuments", args.documentId);
+    if (
+      !document ||
+      document.workspaceId !== args.workspaceId ||
+      document.processingGeneration !== args.processingGeneration ||
+      document.processingState !== "extracting" ||
+      document.rawState !== "present" ||
+      !document.storageId ||
+      !["application/pdf", "image/jpeg", "image/png"].includes(
+        document.mimeType,
+      )
+    ) {
+      return null;
+    }
+    return {
+      storageId: document.storageId,
+      mimeType: document.mimeType as
+        "application/pdf" | "image/jpeg" | "image/png",
+    };
+  },
+});
+
+export const recordFailure = internalMutation({
+  args: { ...sourceArgs, attempt: v.number() },
+  returns: v.union(
+    v.object({ status: v.literal("retrying") }),
+    v.object({ status: v.literal("failed") }),
+    v.object({ status: v.literal("stale") }),
+  ),
+  handler: async (ctx, args) => {
+    if (
+      !(await getActiveWorkspaceForGeneration(
+        ctx,
+        args.workspaceId,
+        args.workspaceGeneration,
+      ))
+    ) {
+      return { status: "stale" as const };
+    }
+    const document = await ctx.db.get("offerDocuments", args.documentId);
+    if (
+      !document ||
+      document.workspaceId !== args.workspaceId ||
+      document.processingGeneration !== args.processingGeneration ||
+      document.processingState !== "extracting" ||
+      document.rawState !== "present"
+    ) {
+      return { status: "stale" as const };
+    }
+    if (args.attempt === 0) {
+      await ctx.scheduler.runAfter(0, extractDocumentRef, {
+        workspaceId: args.workspaceId,
+        workspaceGeneration: args.workspaceGeneration,
+        documentId: args.documentId,
+        processingGeneration: args.processingGeneration,
+        attempt: 1,
+      });
+      return { status: "retrying" as const };
+    }
+    await ctx.db.patch("offerDocuments", args.documentId, {
+      processingState: "failed",
+      failedStage: "extracting",
+      errorCode: "EXTRACTION_FAILED",
+      errorMessage: "We couldn't read this offer. Try extraction again.",
+      updatedAt: Date.now(),
+    });
+    return { status: "failed" as const };
+  },
 });
 
 export const commit = internalMutation({

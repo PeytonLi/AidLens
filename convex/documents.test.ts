@@ -99,6 +99,70 @@ const advanceProcessing = makeFunctionReference<
   },
   boolean
 >("documents:advanceProcessing");
+const completeValidation = makeFunctionReference<
+  "mutation",
+  {
+    workspaceId: Id<"workspaces">;
+    workspaceGeneration: number;
+    documentId: Id<"offerDocuments">;
+    processingGeneration: number;
+    result: {
+      status: "valid";
+      mimeType: "application/pdf";
+      byteSize: number;
+      sha256: string;
+    };
+  },
+  boolean
+>("documents:completeValidation");
+
+test("S5 pipeline: successful validation schedules one extraction job", async () => {
+  const t = createTest();
+  const alice = await authenticated(t, "alice@example.com");
+  const { workspaceId } = await alice.mutation(confirmAge, { confirmed: true });
+  const documentId = await t.run((ctx) =>
+    ctx.db.insert("offerDocuments", {
+      workspaceId,
+      fileName: "offer.pdf",
+      mimeType: "application/pdf",
+      byteSize: 20,
+      sha256: "fixture",
+      sourceRoute: "upload",
+      retentionDeadline: Date.now() + 60_000,
+      rawState: "present",
+      processingState: "validating",
+      processingGeneration: 0,
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+    }),
+  );
+
+  await expect(
+    t.mutation(completeValidation, {
+      workspaceId,
+      workspaceGeneration: 0,
+      documentId,
+      processingGeneration: 0,
+      result: {
+        status: "valid",
+        mimeType: "application/pdf",
+        byteSize: 20,
+        sha256: "fixture",
+      },
+    }),
+  ).resolves.toBe(true);
+  const jobs = await t.run((ctx) =>
+    ctx.db.system.query("_scheduled_functions").collect(),
+  );
+  expect(jobs).toHaveLength(1);
+  expect(jobs[0].args[0]).toMatchObject({
+    workspaceId,
+    workspaceGeneration: 0,
+    documentId,
+    processingGeneration: 0,
+    attempt: 0,
+  });
+});
 
 test("only the workspace owner can obtain an upload URL", async () => {
   const t = createTest();

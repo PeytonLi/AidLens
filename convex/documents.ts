@@ -71,6 +71,10 @@ const cleanupOrphanStorageRef = makeFunctionReference<
   "mutation",
   { storageId: import("./_generated/dataModel").Id<"_storage"> }
 >("documents:cleanupOrphanStorage");
+const extractDocumentRef = makeFunctionReference<
+  "action",
+  ValidationArgs & { attempt: number }
+>("fireworks:extractDocument");
 
 export const generateUploadUrl = mutation({
   args: { workspaceId: v.id("workspaces") },
@@ -450,6 +454,13 @@ export const completeValidation = internalMutation({
       errorCode: undefined,
       errorMessage: undefined,
       updatedAt: now,
+    });
+    await ctx.scheduler.runAfter(0, extractDocumentRef, {
+      workspaceId: args.workspaceId,
+      workspaceGeneration: args.workspaceGeneration,
+      documentId: args.documentId,
+      processingGeneration: args.processingGeneration,
+      attempt: 0,
     });
     return true;
   },

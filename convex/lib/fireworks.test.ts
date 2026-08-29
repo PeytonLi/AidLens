@@ -3,6 +3,7 @@ import {
   buildFireworksExtractionRequest,
   readFireworksConfig,
   requestFireworksExtraction,
+  requestFireworksExtractionWithRetry,
 } from "./fireworks";
 
 it("S5.1: requires server-side Fireworks configuration", () => {
@@ -135,4 +136,59 @@ it("S5.1: calls Fireworks server-side and returns the structured content", async
       }),
     }),
   );
+});
+
+it("S5.6: retries one schema-invalid response and then succeeds", async () => {
+  const valid = {
+    version: "v1",
+    schoolCandidates: [],
+    offer: {
+      academicYear: "unknown",
+      startTerm: "unknown",
+      endTerm: "unknown",
+      enrollmentIntensity: "unknown",
+      housingAssumption: "unknown",
+      residencyAssumption: "unknown",
+      overallConfidence: 0,
+      lineItems: [],
+    },
+  };
+  const fetcher = vi
+    .fn()
+    .mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          choices: [
+            { finish_reason: "stop", message: { content: "not json" } },
+          ],
+        }),
+        { status: 200 },
+      ),
+    )
+    .mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          choices: [
+            {
+              finish_reason: "stop",
+              message: { content: JSON.stringify(valid) },
+            },
+          ],
+        }),
+        { status: 200 },
+      ),
+    );
+
+  await expect(
+    requestFireworksExtractionWithRetry(
+      {
+        apiKey: "secret-test-key",
+        model: "accounts/fireworks/models/kimi-k2p6",
+        mimeType: "image/png",
+        base64: "page",
+      },
+      fetcher,
+    ),
+  ).resolves.toEqual(valid);
+  expect(fetcher).toHaveBeenCalledTimes(2);
 });

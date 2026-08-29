@@ -16,6 +16,25 @@ const commitExtraction = makeFunctionReference<
     result: typeof extraction;
   }
 >("extractions:commit");
+const getSource = makeFunctionReference<
+  "query",
+  {
+    workspaceId: Id<"workspaces">;
+    workspaceGeneration: number;
+    documentId: Id<"offerDocuments">;
+    processingGeneration: number;
+  }
+>("extractions:getSource");
+const recordFailure = makeFunctionReference<
+  "mutation",
+  {
+    workspaceId: Id<"workspaces">;
+    workspaceGeneration: number;
+    documentId: Id<"offerDocuments">;
+    processingGeneration: number;
+    attempt: number;
+  }
+>("extractions:recordFailure");
 
 const extraction = {
   version: "v1" as const,
@@ -75,8 +94,12 @@ test("S5.2: a validated extraction commits cited preliminary facts atomically", 
       createdAt: Date.now(),
       updatedAt: Date.now(),
     });
+    const storageId = await ctx.storage.store(
+      new Blob(["%PDF-1.4\n%%EOF"], { type: "application/pdf" }),
+    );
     const documentId = await ctx.db.insert("offerDocuments", {
       workspaceId,
+      storageId,
       fileName: "offer.pdf",
       mimeType: "application/pdf",
       byteSize: 100,
@@ -89,11 +112,24 @@ test("S5.2: a validated extraction commits cited preliminary facts atomically", 
       createdAt: Date.now(),
       updatedAt: Date.now(),
     });
-    return { workspaceId, documentId };
+    return { workspaceId, documentId, storageId };
+  });
+
+  await expect(
+    t.query(getSource, {
+      workspaceId: ids.workspaceId,
+      workspaceGeneration: 0,
+      documentId: ids.documentId,
+      processingGeneration: 0,
+    }),
+  ).resolves.toEqual({
+    storageId: ids.storageId,
+    mimeType: "application/pdf",
   });
 
   const firstCommit = await t.mutation(commitExtraction, {
-    ...ids,
+    workspaceId: ids.workspaceId,
+    documentId: ids.documentId,
     workspaceGeneration: 0,
     processingGeneration: 0,
     result: extraction,
@@ -101,7 +137,8 @@ test("S5.2: a validated extraction commits cited preliminary facts atomically", 
   expect(firstCommit).toMatchObject({ status: "created" });
   await expect(
     t.mutation(commitExtraction, {
-      ...ids,
+      workspaceId: ids.workspaceId,
+      documentId: ids.documentId,
       workspaceGeneration: 0,
       processingGeneration: 0,
       result: extraction,
@@ -118,7 +155,8 @@ test("S5.2: a validated extraction commits cited preliminary facts atomically", 
   );
   await expect(
     t.mutation(commitExtraction, {
-      ...ids,
+      workspaceId: ids.workspaceId,
+      documentId: ids.documentId,
       workspaceGeneration: 0,
       processingGeneration: 0,
       result: extraction,
@@ -153,4 +191,39 @@ test("S5.2: a validated extraction commits cited preliminary facts atomically", 
       identityState: "candidate",
     }),
   ]);
+
+  await t.run((ctx) =>
+    ctx.db.patch("offerDocuments", ids.documentId, {
+      processingState: "extracting",
+    }),
+  );
+  await expect(
+    t.mutation(recordFailure, {
+      workspaceId: ids.workspaceId,
+      workspaceGeneration: 0,
+      documentId: ids.documentId,
+      processingGeneration: 1,
+      attempt: 0,
+    }),
+  ).resolves.toEqual({ status: "retrying" });
+  await expect(
+    t.run((ctx) => ctx.db.system.query("_scheduled_functions").collect()),
+  ).resolves.toHaveLength(1);
+  await expect(
+    t.mutation(recordFailure, {
+      workspaceId: ids.workspaceId,
+      workspaceGeneration: 0,
+      documentId: ids.documentId,
+      processingGeneration: 1,
+      attempt: 1,
+    }),
+  ).resolves.toEqual({ status: "failed" });
+  await expect(
+    t.run((ctx) => ctx.db.get("offerDocuments", ids.documentId)),
+  ).resolves.toMatchObject({
+    processingState: "failed",
+    failedStage: "extracting",
+    errorCode: "EXTRACTION_FAILED",
+    errorMessage: "We couldn't read this offer. Try extraction again.",
+  });
 });
