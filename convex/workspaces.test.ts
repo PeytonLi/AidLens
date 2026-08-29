@@ -259,8 +259,8 @@ test("only an owner can choose a school and deletion cascades private children",
     }),
   ).rejects.toHaveProperty("message", "Not found");
 
-  const { storageId, documentId, offerId, lineItemId, auditId } = await t.run(
-    async (ctx) => {
+  const { storageId, documentId, offerId, lineItemId, auditId, settingsId } =
+    await t.run(async (ctx) => {
       const now = Date.now();
       const storageId = await ctx.storage.store(new Blob(["private offer"]));
       const documentId = await ctx.db.insert("offerDocuments", {
@@ -325,9 +325,21 @@ test("only an owner can choose a school and deletion cascades private children",
         createdAt: now,
         updatedAt: now,
       });
-      return { storageId, documentId, offerId, lineItemId, auditId };
-    },
-  );
+      const settingsId = await ctx.db.insert("comparisonSettings", {
+        workspaceId: aliceIds.workspaceId,
+        annualCostGrowthBps: 300,
+        scenario: "conservative",
+        updatedAt: now,
+      });
+      return {
+        storageId,
+        documentId,
+        offerId,
+        lineItemId,
+        auditId,
+        settingsId,
+      };
+    });
 
   await alice.mutation(remove, { workspaceId: aliceIds.workspaceId });
   await t.finishAllScheduledFunctions(() => {});
@@ -345,6 +357,9 @@ test("only an owner can choose a school and deletion cascades private children",
   ).resolves.toBeNull();
   await expect(
     t.run((ctx) => ctx.db.get("lineItems", lineItemId)),
+  ).resolves.toBeNull();
+  await expect(
+    t.run((ctx) => ctx.db.get("comparisonSettings", settingsId)),
   ).resolves.toBeNull();
   await expect(t.run((ctx) => ctx.storage.get(storageId))).resolves.toBeNull();
 });

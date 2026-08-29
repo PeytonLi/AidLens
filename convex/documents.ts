@@ -80,6 +80,13 @@ export const generateUploadUrl = mutation({
   args: { workspaceId: v.id("workspaces") },
   handler: async (ctx, { workspaceId }) => {
     await requireActiveWorkspace(ctx, workspaceId);
+    const activeOffers = await ctx.db
+      .query("offers")
+      .withIndex("by_workspaceId_active", (index) =>
+        index.eq("workspaceId", workspaceId).eq("active", true),
+      )
+      .take(4);
+    if (activeOffers.length === 4) throw new Error("OFFER_LIMIT_REACHED");
     return await ctx.storage.generateUploadUrl();
   },
 });

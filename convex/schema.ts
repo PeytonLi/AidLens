@@ -140,6 +140,12 @@ export default defineSchema({
     .index("by_schoolId_active", ["schoolId", "active"])
     .index("by_schoolId_version", ["schoolId", "version"])
     .index("by_documentId", ["documentId"]),
+  comparisonSettings: defineTable({
+    workspaceId: v.id("workspaces"),
+    annualCostGrowthBps: v.number(),
+    scenario: v.union(v.literal("conservative"), v.literal("optimistic")),
+    updatedAt: v.number(),
+  }).index("by_workspaceId", ["workspaceId"]),
   lineItems: defineTable({
     workspaceId: v.id("workspaces"),
     offerId: v.id("offers"),

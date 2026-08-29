@@ -127,6 +127,25 @@ export const continueRemoval = internalMutation({
       return false;
     }
 
+    const comparisonSettings = await ctx.db
+      .query("comparisonSettings")
+      .withIndex("by_workspaceId", (query) =>
+        query.eq("workspaceId", workspaceId),
+      )
+      .take(DELETE_BATCH_SIZE);
+    if (comparisonSettings.length) {
+      await Promise.all(
+        comparisonSettings.map(({ _id }) =>
+          ctx.db.delete("comparisonSettings", _id),
+        ),
+      );
+      await ctx.scheduler.runAfter(0, continueRemovalRef, {
+        workspaceId,
+        generation,
+      });
+      return false;
+    }
+
     const audits = await ctx.db
       .query("auditEvents")
       .withIndex("by_workspaceId_createdAt", (query) =>

@@ -818,6 +818,60 @@ test("an owner can explicitly retry a failed extraction", async () => {
   expect(retried).not.toHaveProperty("errorCode");
 });
 
+test("S6.2: a fifth active offer is blocked before upload", async () => {
+  const t = createTest();
+  const alice = await authenticated(t, "alice@example.com");
+  const { workspaceId } = await alice.mutation(confirmAge, { confirmed: true });
+  const offerIds = await t.run(async (ctx) => {
+    const now = Date.now();
+    const ids: Id<"offers">[] = [];
+    for (let index = 0; index < 4; index++) {
+      const documentId = await ctx.db.insert("offerDocuments", {
+        workspaceId,
+        fileName: `offer-${index}.pdf`,
+        mimeType: "application/pdf",
+        byteSize: 1,
+        sha256: `offer-${index}`,
+        sourceRoute: "upload",
+        retentionDeadline: now + 60_000,
+        rawState: "deleted",
+        processingState: "ready",
+        processingGeneration: 0,
+        createdAt: now,
+        updatedAt: now,
+      });
+      ids.push(
+        await ctx.db.insert("offers", {
+          workspaceId,
+          documentId,
+          version: 1,
+          active: true,
+          reviewState: "reviewed",
+          academicYear: "2026-2027",
+          startTerm: "Fall 2026",
+          endTerm: "Spring 2027",
+          enrollmentIntensity: "full_time",
+          housingAssumption: "unknown",
+          residencyAssumption: "unknown",
+          overallConfidence: 1,
+          revision: 0,
+          createdAt: now,
+          updatedAt: now,
+        }),
+      );
+    }
+    return ids;
+  });
+
+  await expect(
+    alice.mutation(generateUploadUrl, { workspaceId }),
+  ).rejects.toThrow("OFFER_LIMIT_REACHED");
+  await t.run((ctx) => ctx.db.patch("offers", offerIds[0], { active: false }));
+  await expect(
+    alice.mutation(generateUploadUrl, { workspaceId }),
+  ).resolves.toMatch(/^https?:\/\//);
+});
+
 test("processing commits allow canonical transitions and reject forbidden or stale writes", async () => {
   vi.useFakeTimers();
   try {

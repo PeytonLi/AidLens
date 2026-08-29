@@ -1010,3 +1010,21 @@ a:focus-visible,
 .story-step--confirmed h3 {
   color: var(--color-brand);
 }
+
+.comparison-page {
+  width: min(100% - 2rem, 72rem);
+  margin-inline: auto;
+  padding-block: clamp(2rem, 6vw, 5rem);
+}
+
+.comparison-page .scenario-controls {
+  margin-block: var(--space-5);
+}
+
+.comparison-page .comparison-table th span {
+  display: block;
+  margin-top: var(--space-1);
+  color: var(--color-ink-muted);
+  font-size: 0.75rem;
+  font-weight: 500;
+}

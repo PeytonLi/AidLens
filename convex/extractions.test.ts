@@ -69,6 +69,18 @@ const listForWorkspace = makeFunctionReference<
   "query",
   { workspaceId: Id<"workspaces"> }
 >("offers:listForWorkspace");
+const getComparison = makeFunctionReference<
+  "query",
+  { workspaceId: Id<"workspaces"> }
+>("offers:getComparison");
+const updateComparisonSettings = makeFunctionReference<
+  "mutation",
+  {
+    workspaceId: Id<"workspaces">;
+    annualCostGrowthBps: number;
+    scenario: "conservative" | "optimistic";
+  }
+>("offers:updateComparisonSettings");
 
 const extraction = {
   version: "v1" as const,
@@ -338,6 +350,45 @@ test("S5.2: a validated extraction commits cited preliminary facts atomically", 
   ).resolves.toMatchObject({
     offer: { reviewState: "reviewed", revision: 1 },
     document: { processingState: "ready" },
+  });
+  await expect(
+    owner.query(getComparison, { workspaceId: ids.workspaceId }),
+  ).resolves.toEqual({
+    settings: { annualCostGrowthBps: 300, scenario: "conservative" },
+    offers: [
+      expect.objectContaining({
+        offer: expect.objectContaining({
+          _id: offerId,
+          reviewState: "reviewed",
+        }),
+        school: expect.objectContaining({ name: "Example University" }),
+        items: expect.arrayContaining([
+          expect.objectContaining({ originalLabel: "Tuition and fees" }),
+        ]),
+      }),
+    ],
+  });
+  await expect(
+    other.query(getComparison, { workspaceId: ids.workspaceId }),
+  ).rejects.toHaveProperty("message", "Not found");
+  await expect(
+    owner.mutation(updateComparisonSettings, {
+      workspaceId: ids.workspaceId,
+      annualCostGrowthBps: 10_001,
+      scenario: "optimistic",
+    }),
+  ).rejects.toThrow("INVALID_GROWTH");
+  await expect(
+    owner.mutation(updateComparisonSettings, {
+      workspaceId: ids.workspaceId,
+      annualCostGrowthBps: 450,
+      scenario: "optimistic",
+    }),
+  ).resolves.toEqual({ annualCostGrowthBps: 450, scenario: "optimistic" });
+  await expect(
+    owner.query(getComparison, { workspaceId: ids.workspaceId }),
+  ).resolves.toMatchObject({
+    settings: { annualCostGrowthBps: 450, scenario: "optimistic" },
   });
 
   const manualIds = await t.run(async (ctx) => {

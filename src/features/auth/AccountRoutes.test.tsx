@@ -12,6 +12,7 @@ interface AuthTestState {
   documents: unknown[] | undefined;
   review: unknown;
   offers: unknown[] | undefined;
+  comparison: unknown;
   token: string | null;
   signIn: ReturnType<typeof vi.fn>;
   signOut: ReturnType<typeof vi.fn>;
@@ -23,6 +24,7 @@ interface AuthTestState {
   retryValidation: ReturnType<typeof vi.fn>;
   deleteRaw: ReturnType<typeof vi.fn>;
   confirmSchool: ReturnType<typeof vi.fn>;
+  updateComparisonSettings: ReturnType<typeof vi.fn>;
 }
 
 const auth = vi.hoisted((): AuthTestState => ({
@@ -32,6 +34,7 @@ const auth = vi.hoisted((): AuthTestState => ({
   documents: undefined,
   review: undefined,
   offers: undefined,
+  comparison: undefined,
   token: null,
   signIn: vi.fn(),
   signOut: vi.fn(),
@@ -43,6 +46,7 @@ const auth = vi.hoisted((): AuthTestState => ({
   retryValidation: vi.fn(),
   deleteRaw: vi.fn(),
   confirmSchool: vi.fn(),
+  updateComparisonSettings: vi.fn(),
 }));
 
 vi.mock("convex/react", () => ({
@@ -60,6 +64,7 @@ vi.mock("convex/react", () => ({
     if (name === "workspaces:getCurrent") return auth.workspace;
     if (name === "offers:getReview") return auth.review;
     if (name === "offers:listForWorkspace") return auth.offers;
+    if (name === "offers:getComparison") return auth.comparison;
     return auth.documents;
   },
   useMutation: (reference: object) => {
@@ -73,6 +78,8 @@ vi.mock("convex/react", () => ({
     if (name === "documents:resolveDuplicate") return auth.resolveDuplicate;
     if (name === "documents:deleteRaw") return auth.deleteRaw;
     if (name === "offers:confirmSchool") return auth.confirmSchool;
+    if (name === "offers:updateComparisonSettings")
+      return auth.updateComparisonSettings;
     return auth.retryValidation;
   },
 }));
@@ -99,6 +106,7 @@ beforeEach(() => {
   auth.documents = undefined;
   auth.review = undefined;
   auth.offers = undefined;
+  auth.comparison = undefined;
   auth.token = null;
   auth.signIn.mockReset();
   auth.signOut.mockReset();
@@ -110,6 +118,7 @@ beforeEach(() => {
   auth.retryValidation.mockReset();
   auth.deleteRaw.mockReset();
   auth.confirmSchool.mockReset();
+  auth.updateComparisonSettings.mockReset();
 });
 
 afterEach(() => {
@@ -455,5 +464,19 @@ describe("private account routes", () => {
     expect(
       await screen.findByRole("link", { name: "Confirm school for award.pdf" }),
     ).toHaveAttribute("href", "/offers/offer-1/review");
+  });
+
+  it("renders the authenticated private comparison route", async () => {
+    auth.status = "signedIn";
+    auth.profile = { ageConfirmedAt: 1 };
+    auth.workspace = { _id: "workspace-1", name: "My offers", generation: 0 };
+    auth.comparison = {
+      settings: { annualCostGrowthBps: 300, scenario: "conservative" },
+      offers: [],
+    };
+
+    renderRoute("/compare");
+
+    expect(await screen.findByText("0 of 2 offers ready")).toBeVisible();
   });
 });

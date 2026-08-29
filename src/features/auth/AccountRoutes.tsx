@@ -17,6 +17,9 @@ import UploadOfferPanel, {
   type UploadItem,
 } from "../upload/UploadOfferPanel";
 import OfferReviewPage, { type OfferReview } from "../review/OfferReviewPage";
+import ComparisonPage, {
+  type ComparisonData,
+} from "../comparison/ComparisonPage";
 
 const getCurrentProfile = makeFunctionReference<
   "query",
@@ -118,6 +121,19 @@ const confirmReviewedOffer = makeFunctionReference<
   "mutation",
   { offerId: Id<"offers">; expectedRevision: number }
 >("offers:confirmReviewed");
+const getComparison = makeFunctionReference<
+  "query",
+  { workspaceId: Id<"workspaces"> },
+  ComparisonData
+>("offers:getComparison");
+const updateComparisonSettings = makeFunctionReference<
+  "mutation",
+  {
+    workspaceId: Id<"workspaces">;
+    annualCostGrowthBps: number;
+    scenario: "conservative" | "optimistic";
+  }
+>("offers:updateComparisonSettings");
 
 function usePrivatePreviews(documents: DocumentSummary[] | undefined) {
   const token = useAuthToken();
@@ -467,6 +483,7 @@ function WorkspacePage() {
           </Link>
         );
       })}
+      <Link to="/compare">Compare offers</Link>
       <p>Email forwarding will be available soon.</p>
       <button type="button" onClick={() => void signOut()}>
         Sign out
@@ -500,6 +517,25 @@ function WorkspacePage() {
         </section>
       )}
     </main>
+  );
+}
+
+function ComparisonRoute() {
+  const workspace = useQuery(getCurrentWorkspace, {});
+  const data = useQuery(
+    getComparison,
+    workspace ? { workspaceId: workspace._id } : "skip",
+  );
+  const updateSettings = useMutation(updateComparisonSettings);
+  if (workspace === undefined || data === undefined) return <SessionStatus />;
+  if (workspace === null) return <Navigate to="/" replace />;
+  return (
+    <ComparisonPage
+      data={data}
+      onUpdateSettings={(settings) =>
+        updateSettings({ workspaceId: workspace._id, ...settings })
+      }
+    />
   );
 }
 
@@ -542,6 +578,7 @@ function OfferReviewRoute() {
 function PrivateRoute() {
   const { pathname } = useLocation();
   if (pathname === "/workspace") return <WorkspacePage />;
+  if (pathname === "/compare") return <ComparisonRoute />;
   if (/^\/offers\/[^/]+\/review$/.test(pathname)) return <OfferReviewRoute />;
   return (
     <main id="main" className="not-found-page">

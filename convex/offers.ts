@@ -30,6 +30,10 @@ const renewal = v.union(
   v.object({ kind: v.literal("conditional") }),
   v.object({ kind: v.literal("unknown") }),
 );
+const comparisonSettings = v.object({
+  annualCostGrowthBps: v.number(),
+  scenario: v.union(v.literal("conservative"), v.literal("optimistic")),
+});
 
 export const listForWorkspace = query({
   args: { workspaceId: v.id("workspaces") },
@@ -42,6 +46,100 @@ export const listForWorkspace = query({
         index.eq("workspaceId", workspaceId).eq("active", true),
       )
       .take(4);
+  },
+});
+
+export const getComparison = query({
+  args: { workspaceId: v.id("workspaces") },
+  returns: v.object({
+    settings: comparisonSettings,
+    offers: v.array(
+      v.object({
+        offer: schema.doc("offers"),
+        school: schema.doc("schools"),
+        items: v.array(schema.doc("lineItems")),
+      }),
+    ),
+  }),
+  handler: async (ctx, { workspaceId }) => {
+    await requireActiveWorkspace(ctx, workspaceId);
+    const [offers, storedSettings] = await Promise.all([
+      ctx.db
+        .query("offers")
+        .withIndex("by_workspaceId_active", (index) =>
+          index.eq("workspaceId", workspaceId).eq("active", true),
+        )
+        .take(4),
+      ctx.db
+        .query("comparisonSettings")
+        .withIndex("by_workspaceId", (index) =>
+          index.eq("workspaceId", workspaceId),
+        )
+        .first(),
+    ]);
+    const result = [];
+    for (const offer of offers) {
+      if (!offer.schoolId) continue;
+      const [school, items] = await Promise.all([
+        ctx.db.get("schools", offer.schoolId),
+        ctx.db
+          .query("lineItems")
+          .withIndex("by_offerId", (index) => index.eq("offerId", offer._id))
+          .take(200),
+      ]);
+      if (school?.workspaceId === workspaceId) {
+        result.push({ offer, school, items });
+      }
+    }
+    return {
+      offers: result,
+      settings: storedSettings
+        ? {
+            annualCostGrowthBps: storedSettings.annualCostGrowthBps,
+            scenario: storedSettings.scenario,
+          }
+        : { annualCostGrowthBps: 300, scenario: "conservative" as const },
+    };
+  },
+});
+
+export const updateComparisonSettings = mutation({
+  args: {
+    workspaceId: v.id("workspaces"),
+    annualCostGrowthBps: v.number(),
+    scenario: v.union(v.literal("conservative"), v.literal("optimistic")),
+  },
+  returns: comparisonSettings,
+  handler: async (ctx, args) => {
+    await requireActiveWorkspace(ctx, args.workspaceId);
+    if (
+      !Number.isSafeInteger(args.annualCostGrowthBps) ||
+      args.annualCostGrowthBps < 0 ||
+      args.annualCostGrowthBps > 10_000
+    ) {
+      throw new Error("INVALID_GROWTH");
+    }
+    const existing = await ctx.db
+      .query("comparisonSettings")
+      .withIndex("by_workspaceId", (index) =>
+        index.eq("workspaceId", args.workspaceId),
+      )
+      .first();
+    const value = {
+      annualCostGrowthBps: args.annualCostGrowthBps,
+      scenario: args.scenario,
+      updatedAt: Date.now(),
+    };
+    if (existing) await ctx.db.patch("comparisonSettings", existing._id, value);
+    else
+      await ctx.db.insert("comparisonSettings", {
+        workspaceId: args.workspaceId,
+        ...value,
+      });
+    return {
+      annualCostGrowthBps: args.annualCostGrowthBps,
+      scenario: args.scenario,
+    };
   },
 });
 
