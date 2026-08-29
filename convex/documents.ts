@@ -318,22 +318,39 @@ export const retryValidation = mutation({
       document.rawState !== "present" ||
       !document.storageId ||
       document.processingState !== "failed" ||
-      document.failedStage !== "validating"
+      (document.failedStage !== "validating" &&
+        document.failedStage !== "extracting")
     ) {
-      throw new Error("Validation retry unavailable");
+      throw new Error("Processing retry unavailable");
     }
     const processingGeneration = document.processingGeneration + 1;
     await ctx.db.patch("offerDocuments", documentId, {
       processingGeneration,
+      processingState:
+        document.failedStage === "extracting" ? "extracting" : "failed",
+      failedStage:
+        document.failedStage === "extracting" ? undefined : "validating",
+      errorCode: undefined,
+      errorMessage: undefined,
       updatedAt: Date.now(),
     });
-    await ctx.scheduler.runAfter(0, validateUploadedFileRef, {
-      workspaceId: workspace._id,
-      workspaceGeneration: workspace.generation,
-      documentId,
-      processingGeneration,
-      retry: true,
-    });
+    if (document.failedStage === "extracting") {
+      await ctx.scheduler.runAfter(0, extractDocumentRef, {
+        workspaceId: workspace._id,
+        workspaceGeneration: workspace.generation,
+        documentId,
+        processingGeneration,
+        attempt: 0,
+      });
+    } else {
+      await ctx.scheduler.runAfter(0, validateUploadedFileRef, {
+        workspaceId: workspace._id,
+        workspaceGeneration: workspace.generation,
+        documentId,
+        processingGeneration,
+        retry: true,
+      });
+    }
     return { status: "scheduled" as const };
   },
 });

@@ -784,6 +784,40 @@ test("an owner can explicitly retry validation while a non-owner cannot", async 
   }
 });
 
+test("an owner can explicitly retry a failed extraction", async () => {
+  const t = createTest();
+  const alice = await authenticated(t, "alice@example.com");
+  const { workspaceId } = await alice.mutation(confirmAge, { confirmed: true });
+  const storageId = await t.run((ctx) =>
+    ctx.storage.store(new Blob(["%PDF-1.4\n"], { type: "application/pdf" })),
+  );
+  const created = await alice.mutation(finalizeUpload, {
+    workspaceId,
+    storageId,
+    fileName: "retry-extraction.pdf",
+  });
+  await t.run(async (ctx) => {
+    await ctx.db.patch("offerDocuments", created.documentId, {
+      processingState: "failed",
+      failedStage: "extracting",
+      errorCode: "PROVIDER_UNAVAILABLE",
+    });
+  });
+
+  await expect(
+    alice.mutation(retryValidation, { documentId: created.documentId }),
+  ).resolves.toEqual({ status: "scheduled" });
+  const retried = await alice.query(getDocument, {
+    documentId: created.documentId,
+  });
+  expect(retried).toMatchObject({
+    processingState: "extracting",
+    processingGeneration: 1,
+  });
+  expect(retried).not.toHaveProperty("failedStage");
+  expect(retried).not.toHaveProperty("errorCode");
+});
+
 test("processing commits allow canonical transitions and reject forbidden or stale writes", async () => {
   vi.useFakeTimers();
   try {

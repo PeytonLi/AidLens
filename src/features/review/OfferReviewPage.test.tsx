@@ -117,8 +117,15 @@ it("S5 review: edits an unknown cited amount without mutating on cancel", async 
   await user.click(
     screen.getByRole("button", { name: "Edit Tuition and fees" }),
   );
+  expect(screen.getByLabelText("Amount in dollars")).toHaveFocus();
   await user.type(screen.getByLabelText("Amount in dollars"), "25000");
+  expect(
+    window.dispatchEvent(new Event("beforeunload", { cancelable: true })),
+  ).toBe(false);
   await user.click(screen.getByRole("button", { name: "Cancel" }));
+  expect(
+    window.dispatchEvent(new Event("beforeunload", { cancelable: true })),
+  ).toBe(true);
   expect(saveItem).not.toHaveBeenCalled();
   expect(screen.getByText("Unknown")).toBeVisible();
 
@@ -126,9 +133,22 @@ it("S5 review: edits an unknown cited amount without mutating on cancel", async 
     screen.getByRole("button", { name: "Edit Tuition and fees" }),
   );
   await user.type(screen.getByLabelText("Amount in dollars"), "25000");
+  await user.selectOptions(screen.getByLabelText("Category"), "grant");
+  await user.selectOptions(screen.getByLabelText("Period"), "semester");
+  await user.selectOptions(screen.getByLabelText("Status"), "accepted");
+  await user.selectOptions(screen.getByLabelText("Renewal"), "fixed");
+  await user.clear(screen.getByLabelText("Renewal years"));
+  await user.type(screen.getByLabelText("Renewal years"), "4");
   await user.click(screen.getByRole("button", { name: "Save field" }));
   expect(saveItem).toHaveBeenCalledWith(
-    expect.objectContaining({ _id: "item-1", amountCents: 2_500_000 }),
+    expect.objectContaining({
+      _id: "item-1",
+      amountCents: 2_500_000,
+      canonicalCategory: "grant",
+      period: "semester",
+      status: "accepted",
+      renewal: { kind: "fixed", durationYears: 4 },
+    }),
   );
   await user.click(
     screen.getByRole("button", { name: "Confirm reviewed offer" }),

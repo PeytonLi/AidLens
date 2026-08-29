@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { Doc, Id } from "../../../convex/_generated/dataModel";
 import { formatUsd } from "../sample/money";
 
@@ -18,6 +18,35 @@ type Props = {
   onConfirmReviewed: (revision: number) => Promise<unknown>;
 };
 
+const categories: Doc<"lineItems">["canonicalCategory"][] = [
+  "direct_cost",
+  "indirect_cost",
+  "grant",
+  "scholarship",
+  "student_loan",
+  "parent_plus",
+  "private_loan",
+  "work_study",
+  "other_financing",
+  "family_contribution",
+  "payment_plan",
+  "unknown",
+];
+const periods = ["academic_year", "semester", "quarter", "month", "one_time"];
+const statuses: Doc<"lineItems">["status"][] = [
+  "offered",
+  "accepted",
+  "declined",
+  "selected",
+];
+const renewalKinds: Doc<"lineItems">["renewal"]["kind"][] = [
+  "unknown",
+  "fixed",
+  "one_time",
+  "nonrenewable",
+  "conditional",
+];
+
 function ReviewItem({
   item,
   onSave,
@@ -29,12 +58,46 @@ function ReviewItem({
   const [amount, setAmount] = useState(
     item.amountCents === null ? "" : String(item.amountCents / 100),
   );
+  const [category, setCategory] = useState(item.canonicalCategory);
+  const [period, setPeriod] = useState(item.period);
+  const [status, setStatus] = useState(item.status);
+  const [renewalKind, setRenewalKind] = useState(item.renewal.kind);
+  const [renewalYears, setRenewalYears] = useState(
+    item.renewal.kind === "fixed" ? String(item.renewal.durationYears) : "1",
+  );
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string>();
+  const dirty =
+    editing &&
+    (amount !==
+      (item.amountCents === null ? "" : String(item.amountCents / 100)) ||
+      category !== item.canonicalCategory ||
+      period !== item.period ||
+      status !== item.status ||
+      renewalKind !== item.renewal.kind ||
+      (renewalKind === "fixed" &&
+        renewalYears !==
+          (item.renewal.kind === "fixed"
+            ? String(item.renewal.durationYears)
+            : "1")));
+
+  useEffect(() => {
+    if (!dirty) return;
+    const warn = (event: BeforeUnloadEvent) => event.preventDefault();
+    window.addEventListener("beforeunload", warn);
+    return () => window.removeEventListener("beforeunload", warn);
+  }, [dirty]);
 
   async function save() {
     if (amount !== "" && !/^\d+(\.\d{1,2})?$/.test(amount)) {
       setError("Enter a dollar amount with no more than two decimal places.");
+      return;
+    }
+    if (
+      renewalKind === "fixed" &&
+      (!/^\d+$/.test(renewalYears) || Number(renewalYears) < 1)
+    ) {
+      setError("Enter at least one renewal year.");
       return;
     }
     setSaving(true);
@@ -43,6 +106,13 @@ function ReviewItem({
       await onSave({
         ...item,
         amountCents: amount === "" ? null : Math.round(Number(amount) * 100),
+        canonicalCategory: category,
+        period,
+        status,
+        renewal:
+          renewalKind === "fixed"
+            ? { kind: "fixed", durationYears: Number(renewalYears) }
+            : { kind: renewalKind },
       });
       setEditing(false);
     } catch {
@@ -70,11 +140,84 @@ function ReviewItem({
           <label>
             Amount in dollars
             <input
+              autoFocus
               inputMode="decimal"
               value={amount}
               onChange={(event) => setAmount(event.target.value)}
             />
           </label>
+          <label>
+            Category
+            <select
+              value={category}
+              onChange={(event) =>
+                setCategory(
+                  event.target.value as Doc<"lineItems">["canonicalCategory"],
+                )
+              }
+            >
+              {categories.map((value) => (
+                <option key={value} value={value}>
+                  {value.replace(/_/g, " ")}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label>
+            Period
+            <select
+              value={period}
+              onChange={(event) => setPeriod(event.target.value)}
+            >
+              {periods.map((value) => (
+                <option key={value} value={value}>
+                  {value.replace(/_/g, " ")}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label>
+            Status
+            <select
+              value={status}
+              onChange={(event) =>
+                setStatus(event.target.value as Doc<"lineItems">["status"])
+              }
+            >
+              {statuses.map((value) => (
+                <option key={value}>{value}</option>
+              ))}
+            </select>
+          </label>
+          <label>
+            Renewal
+            <select
+              value={renewalKind}
+              onChange={(event) =>
+                setRenewalKind(
+                  event.target.value as Doc<"lineItems">["renewal"]["kind"],
+                )
+              }
+            >
+              {renewalKinds.map((value) => (
+                <option key={value} value={value}>
+                  {value.replace(/_/g, " ")}
+                </option>
+              ))}
+            </select>
+          </label>
+          {renewalKind === "fixed" ? (
+            <label>
+              Renewal years
+              <input
+                type="number"
+                min="1"
+                step="1"
+                value={renewalYears}
+                onChange={(event) => setRenewalYears(event.target.value)}
+              />
+            </label>
+          ) : null}
           {error ? <p role="alert">{error}</p> : null}
           <button type="button" disabled={saving} onClick={() => void save()}>
             Save field
@@ -85,6 +228,15 @@ function ReviewItem({
             onClick={() => {
               setAmount(
                 item.amountCents === null ? "" : String(item.amountCents / 100),
+              );
+              setCategory(item.canonicalCategory);
+              setPeriod(item.period);
+              setStatus(item.status);
+              setRenewalKind(item.renewal.kind);
+              setRenewalYears(
+                item.renewal.kind === "fixed"
+                  ? String(item.renewal.durationYears)
+                  : "1",
               );
               setEditing(false);
               setError(undefined);
