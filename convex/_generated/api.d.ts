@@ -16,6 +16,7 @@ import type * as http from "../http.js";
 import type * as lib_auth from "../lib/auth.js";
 import type * as lib_fileValidation from "../lib/fileValidation.js";
 import type * as lib_fireworks from "../lib/fireworks.js";
+import type * as lib_pdfRendering from "../lib/pdfRendering.js";
 import type * as myFunctions from "../myFunctions.js";
 import type * as profiles from "../profiles.js";
 import type * as retention from "../retention.js";
@@ -36,6 +37,7 @@ declare const fullApi: ApiFromModules<{
   "lib/auth": typeof lib_auth;
   "lib/fileValidation": typeof lib_fileValidation;
   "lib/fireworks": typeof lib_fireworks;
+  "lib/pdfRendering": typeof lib_pdfRendering;
   myFunctions: typeof myFunctions;
   profiles: typeof profiles;
   retention: typeof retention;

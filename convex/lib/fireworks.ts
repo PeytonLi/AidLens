@@ -20,9 +20,10 @@ export function buildFireworksExtractionRequest({
 }: {
   model: string;
   mimeType: "application/pdf" | "image/jpeg" | "image/png";
-  base64: string;
+  base64: string | string[];
 }) {
   if (mimeType === "application/pdf") throw new Error("PDF_RENDER_REQUIRED");
+  const pages = Array.isArray(base64) ? base64 : [base64];
   return {
     model,
     temperature: 0,
@@ -39,10 +40,10 @@ export function buildFireworksExtractionRequest({
             type: "text" as const,
             text: "Return only source-backed facts using the required JSON schema.",
           },
-          {
+          ...pages.map((page) => ({
             type: "image_url" as const,
-            image_url: { url: `data:${mimeType};base64,${base64}` },
-          },
+            image_url: { url: `data:${mimeType};base64,${page}` },
+          })),
         ],
       },
     ],
@@ -62,7 +63,7 @@ export async function requestFireworksExtraction(
     apiKey: string;
     model: string;
     mimeType: "application/pdf" | "image/jpeg" | "image/png";
-    base64: string;
+    base64: string | string[];
   },
   fetcher: typeof fetch = fetch,
 ): Promise<ExtractionResultV1> {

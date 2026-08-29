@@ -62,6 +62,26 @@ describe("buildFireworksExtractionRequest", () => {
       }),
     ).toThrow("PDF_RENDER_REQUIRED");
   });
+
+  it("S5.1: sends every rendered PDF page as a vision image", () => {
+    const request = buildFireworksExtractionRequest({
+      model: "accounts/fireworks/models/kimi-k2p6",
+      mimeType: "image/png",
+      base64: ["page-one", "page-two"],
+    });
+
+    expect(request.messages[1].content).toEqual([
+      expect.objectContaining({ type: "text" }),
+      {
+        type: "image_url",
+        image_url: { url: "data:image/png;base64,page-one" },
+      },
+      {
+        type: "image_url",
+        image_url: { url: "data:image/png;base64,page-two" },
+      },
+    ]);
+  });
 });
 
 it("S5.1: calls Fireworks server-side and returns the structured content", async () => {

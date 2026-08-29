@@ -29,7 +29,9 @@
   },
   "dependencies": {
     "@convex-dev/auth": "^0.0.95",
+    "@napi-rs/canvas": "^1.0.8",
     "convex": "^1.44.0",
+    "pdf-to-img": "^6.3.0",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
     "react-router-dom": "^7.18.2"
