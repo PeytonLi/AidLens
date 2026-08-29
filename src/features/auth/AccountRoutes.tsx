@@ -16,6 +16,7 @@ import UploadOfferPanel, {
   type DuplicateChoice,
   type UploadItem,
 } from "../upload/UploadOfferPanel";
+import OfferReviewPage, { type OfferReview } from "../review/OfferReviewPage";
 
 const getCurrentProfile = makeFunctionReference<
   "query",
@@ -43,6 +44,11 @@ const listDocuments = makeFunctionReference<
   { workspaceId: Id<"workspaces"> },
   DocumentSummary[]
 >("documents:listDocuments");
+const listOffers = makeFunctionReference<
+  "query",
+  { workspaceId: Id<"workspaces"> },
+  Doc<"offers">[]
+>("offers:listForWorkspace");
 const generateUploadUrl = makeFunctionReference<
   "mutation",
   { workspaceId: Id<"workspaces"> },
@@ -83,6 +89,35 @@ const deleteRaw = makeFunctionReference<
   { documentId: Id<"offerDocuments"> },
   boolean
 >("documents:deleteRaw");
+const getOfferReview = makeFunctionReference<
+  "query",
+  { offerId: Id<"offers"> },
+  OfferReview
+>("offers:getReview");
+const confirmOfferSchool = makeFunctionReference<
+  "mutation",
+  { offerId: Id<"offers">; schoolId: Id<"schools"> }
+>("offers:confirmSchool");
+const confirmManualSchool = makeFunctionReference<
+  "mutation",
+  { offerId: Id<"offers">; name: string; officialDomain: string }
+>("offers:confirmManualSchool");
+const correctOfferLineItem = makeFunctionReference<
+  "mutation",
+  {
+    lineItemId: Id<"lineItems">;
+    expectedRevision: number;
+    amountCents: number | null;
+    canonicalCategory: Doc<"lineItems">["canonicalCategory"];
+    period: string;
+    status: Doc<"lineItems">["status"];
+    renewal: Doc<"lineItems">["renewal"];
+  }
+>("offers:correctLineItem");
+const confirmReviewedOffer = makeFunctionReference<
+  "mutation",
+  { offerId: Id<"offers">; expectedRevision: number }
+>("offers:confirmReviewed");
 
 function usePrivatePreviews(documents: DocumentSummary[] | undefined) {
   const token = useAuthToken();
@@ -267,6 +302,10 @@ function WorkspacePage() {
     listDocuments,
     workspace ? { workspaceId: workspace._id } : "skip",
   );
+  const offers = useQuery(
+    listOffers,
+    workspace ? { workspaceId: workspace._id } : "skip",
+  );
   const createUploadUrl = useMutation(generateUploadUrl);
   const finalize = useMutation(finalizeUpload);
   const resolve = useMutation(resolveDuplicate);
@@ -413,6 +452,21 @@ function WorkspacePage() {
           }
         }}
       />
+      {(offers ?? []).map((offer) => {
+        const document = documents?.find(({ _id }) => _id === offer.documentId);
+        if (!document) return null;
+        const action =
+          document.processingState === "needs_school_confirmation"
+            ? "Confirm school for"
+            : offer.reviewState === "preliminary"
+              ? "Review offer from"
+              : "View reviewed offer from";
+        return (
+          <Link key={offer._id} to={`/offers/${offer._id}/review`}>
+            {action} {document.fileName}
+          </Link>
+        );
+      })}
       <p>Email forwarding will be available soon.</p>
       <button type="button" onClick={() => void signOut()}>
         Sign out
@@ -449,9 +503,46 @@ function WorkspacePage() {
   );
 }
 
+function OfferReviewRoute() {
+  const match = useLocation().pathname.match(/^\/offers\/([^/]+)\/review$/);
+  const id = match?.[1] as Id<"offers"> | undefined;
+  const review = useQuery(getOfferReview, id ? { offerId: id } : "skip");
+  const confirmSchool = useMutation(confirmOfferSchool);
+  const confirmManual = useMutation(confirmManualSchool);
+  const correctItem = useMutation(correctOfferLineItem);
+  const confirmReviewed = useMutation(confirmReviewedOffer);
+
+  if (!id) return <Navigate to="/workspace" replace />;
+  if (review === undefined) return <SessionStatus />;
+  return (
+    <OfferReviewPage
+      review={review}
+      onConfirmSchool={(schoolId) => confirmSchool({ offerId: id, schoolId })}
+      onConfirmManual={(name, officialDomain) =>
+        confirmManual({ offerId: id, name, officialDomain })
+      }
+      onSaveItem={(item) =>
+        correctItem({
+          lineItemId: item._id,
+          expectedRevision: item.revision,
+          amountCents: item.amountCents,
+          canonicalCategory: item.canonicalCategory,
+          period: item.period,
+          status: item.status,
+          renewal: item.renewal,
+        })
+      }
+      onConfirmReviewed={(expectedRevision) =>
+        confirmReviewed({ offerId: id, expectedRevision })
+      }
+    />
+  );
+}
+
 function PrivateRoute() {
   const { pathname } = useLocation();
   if (pathname === "/workspace") return <WorkspacePage />;
+  if (/^\/offers\/[^/]+\/review$/.test(pathname)) return <OfferReviewRoute />;
   return (
     <main id="main" className="not-found-page">
       <h1>Not found</h1>

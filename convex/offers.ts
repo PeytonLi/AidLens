@@ -31,20 +31,41 @@ const renewal = v.union(
   v.object({ kind: v.literal("unknown") }),
 );
 
+export const listForWorkspace = query({
+  args: { workspaceId: v.id("workspaces") },
+  returns: v.array(schema.doc("offers")),
+  handler: async (ctx, { workspaceId }) => {
+    await requireActiveWorkspace(ctx, workspaceId);
+    return await ctx.db
+      .query("offers")
+      .withIndex("by_workspaceId_active", (index) =>
+        index.eq("workspaceId", workspaceId).eq("active", true),
+      )
+      .take(4);
+  },
+});
+
 export const getReview = query({
   args: { offerId: v.id("offers") },
   returns: v.object({
     offer: schema.doc("offers"),
-    school: schema.doc("schools"),
+    school: v.union(schema.doc("schools"), v.null()),
+    candidates: v.array(schema.doc("schools")),
     items: v.array(schema.doc("lineItems")),
     rawDeletedAt: v.union(v.number(), v.null()),
   }),
   handler: async (ctx, { offerId }) => {
     const offer = await ctx.db.get("offers", offerId);
-    if (!offer || !offer.schoolId || !offer.active) throw new Error(NOT_FOUND);
+    if (!offer || !offer.active) throw new Error(NOT_FOUND);
     await requireActiveWorkspace(ctx, offer.workspaceId);
-    const [school, document, items] = await Promise.all([
-      ctx.db.get("schools", offer.schoolId),
+    const [school, candidates, document, items] = await Promise.all([
+      offer.schoolId ? ctx.db.get("schools", offer.schoolId) : null,
+      ctx.db
+        .query("schools")
+        .withIndex("by_sourceDocumentId", (index) =>
+          index.eq("sourceDocumentId", offer.documentId),
+        )
+        .take(10),
       ctx.db.get("offerDocuments", offer.documentId),
       ctx.db
         .query("lineItems")
@@ -52,8 +73,7 @@ export const getReview = query({
         .take(200),
     ]);
     if (
-      !school ||
-      school.workspaceId !== offer.workspaceId ||
+      (school !== null && school.workspaceId !== offer.workspaceId) ||
       !document ||
       document.workspaceId !== offer.workspaceId
     ) {
@@ -71,6 +91,7 @@ export const getReview = query({
     return {
       offer,
       school,
+      candidates,
       items,
       rawDeletedAt: document.rawDeletedAt ?? null,
     };
@@ -197,6 +218,83 @@ export const confirmReviewed = mutation({
       createdAt: now,
     });
     return { status: "reviewed" as const, revision: offer.revision };
+  },
+});
+
+export const confirmManualSchool = mutation({
+  args: {
+    offerId: v.id("offers"),
+    name: v.string(),
+    officialDomain: v.string(),
+  },
+  returns: v.object({
+    status: v.literal("confirmed"),
+    schoolId: v.id("schools"),
+  }),
+  handler: async (ctx, { offerId, name, officialDomain }) => {
+    const offer = await ctx.db.get("offers", offerId);
+    if (!offer) throw new Error(NOT_FOUND);
+    await requireActiveWorkspace(ctx, offer.workspaceId);
+    const [document, currentSchool] = await Promise.all([
+      ctx.db.get("offerDocuments", offer.documentId),
+      offer.schoolId ? ctx.db.get("schools", offer.schoolId) : null,
+    ]);
+    name = name.trim();
+    let parsed: URL;
+    try {
+      parsed = new URL(
+        officialDomain.includes("://")
+          ? officialDomain
+          : `https://${officialDomain}`,
+      );
+    } catch {
+      throw new Error("INVALID_DOMAIN");
+    }
+    const hostname = parsed.hostname.toLowerCase().replace(/^www\./, "");
+    if (
+      !offer.active ||
+      offer.reviewState !== "preliminary" ||
+      currentSchool?.identityState === "confirmed" ||
+      (currentSchool !== null &&
+        currentSchool.workspaceId !== offer.workspaceId) ||
+      !document ||
+      document.workspaceId !== offer.workspaceId ||
+      document.processingState !== "needs_school_confirmation" ||
+      name.length === 0 ||
+      name.length > 160 ||
+      parsed.username !== "" ||
+      parsed.password !== "" ||
+      parsed.port !== "" ||
+      !hostname.includes(".") ||
+      hostname === "localhost" ||
+      /^\d+(\.\d+){3}$/.test(hostname)
+    ) {
+      throw new Error("INVALID_DOMAIN");
+    }
+    const now = Date.now();
+    const schoolId = await ctx.db.insert("schools", {
+      workspaceId: offer.workspaceId,
+      name,
+      officialDomain: hostname,
+      identityState: "confirmed",
+      createdAt: now,
+      updatedAt: now,
+    });
+    await ctx.db.patch("offers", offerId, { schoolId, updatedAt: now });
+    await ctx.db.patch("offerDocuments", offer.documentId, {
+      schoolId,
+      processingState: "needs_review",
+      updatedAt: now,
+    });
+    await ctx.db.insert("auditEvents", {
+      workspaceId: offer.workspaceId,
+      actor: "user",
+      eventType: "school_confirmed",
+      documentId: offer.documentId,
+      safeMetadata: { reason: "manual_entry" },
+      createdAt: now,
+    });
+    return { status: "confirmed" as const, schoolId };
   },
 });
 

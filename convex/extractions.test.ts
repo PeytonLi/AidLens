@@ -60,6 +60,15 @@ const confirmReviewed = makeFunctionReference<
   { offerId: Id<"offers">; expectedRevision: number },
   { status: "reviewed"; revision: number }
 >("offers:confirmReviewed");
+const confirmManualSchool = makeFunctionReference<
+  "mutation",
+  { offerId: Id<"offers">; name: string; officialDomain: string },
+  { status: "confirmed"; schoolId: Id<"schools"> }
+>("offers:confirmManualSchool");
+const listForWorkspace = makeFunctionReference<
+  "query",
+  { workspaceId: Id<"workspaces"> }
+>("offers:listForWorkspace");
 
 const extraction = {
   version: "v1" as const,
@@ -241,6 +250,15 @@ test("S5.2: a validated extraction commits cited preliminary facts atomically", 
   const offerId = persisted.offers[0]._id;
   const schoolId = persisted.schools[0]._id;
   await expect(
+    owner.query(listForWorkspace, { workspaceId: ids.workspaceId }),
+  ).resolves.toEqual([
+    expect.objectContaining({ _id: offerId, documentId: ids.documentId }),
+  ]);
+  await expect(owner.query(getReview, { offerId })).resolves.toMatchObject({
+    school: { _id: schoolId, identityState: "candidate" },
+    candidates: [{ _id: schoolId, name: "Example University" }],
+  });
+  await expect(
     other.mutation(confirmSchool, { offerId, schoolId }),
   ).rejects.toHaveProperty("message", "Not found");
   await expect(
@@ -320,6 +338,61 @@ test("S5.2: a validated extraction commits cited preliminary facts atomically", 
   ).resolves.toMatchObject({
     offer: { reviewState: "reviewed", revision: 1 },
     document: { processingState: "ready" },
+  });
+
+  const manualIds = await t.run(async (ctx) => {
+    const now = Date.now();
+    const documentId = await ctx.db.insert("offerDocuments", {
+      workspaceId: ids.workspaceId,
+      fileName: "manual.pdf",
+      mimeType: "application/pdf",
+      byteSize: 10,
+      sha256: "manual-fixture",
+      sourceRoute: "upload",
+      retentionDeadline: now + 60_000,
+      rawState: "present",
+      processingState: "needs_school_confirmation",
+      processingGeneration: 0,
+      createdAt: now,
+      updatedAt: now,
+    });
+    const offerId = await ctx.db.insert("offers", {
+      workspaceId: ids.workspaceId,
+      documentId,
+      version: 1,
+      active: true,
+      reviewState: "preliminary",
+      academicYear: "2026-2027",
+      startTerm: "Fall 2026",
+      endTerm: "Spring 2027",
+      enrollmentIntensity: "full_time",
+      housingAssumption: "unknown",
+      residencyAssumption: "unknown",
+      overallConfidence: 0.5,
+      revision: 0,
+      createdAt: now,
+      updatedAt: now,
+    });
+    return { documentId, offerId };
+  });
+  await expect(
+    owner.mutation(confirmManualSchool, {
+      offerId: manualIds.offerId,
+      name: "Manual College",
+      officialDomain: "HTTPS://WWW.Manual.EDU/path",
+    }),
+  ).resolves.toMatchObject({ status: "confirmed" });
+  await expect(
+    t.run(async (ctx) => {
+      const offer = await ctx.db.get("offers", manualIds.offerId);
+      return offer?.schoolId
+        ? await ctx.db.get("schools", offer.schoolId)
+        : null;
+    }),
+  ).resolves.toMatchObject({
+    name: "Manual College",
+    officialDomain: "manual.edu",
+    identityState: "confirmed",
   });
 
   await t.run((ctx) =>

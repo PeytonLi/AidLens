@@ -10,6 +10,8 @@ interface AuthTestState {
   workspace:
     undefined | null | { _id: string; name: string; generation: number };
   documents: unknown[] | undefined;
+  review: unknown;
+  offers: unknown[] | undefined;
   token: string | null;
   signIn: ReturnType<typeof vi.fn>;
   signOut: ReturnType<typeof vi.fn>;
@@ -20,6 +22,7 @@ interface AuthTestState {
   resolveDuplicate: ReturnType<typeof vi.fn>;
   retryValidation: ReturnType<typeof vi.fn>;
   deleteRaw: ReturnType<typeof vi.fn>;
+  confirmSchool: ReturnType<typeof vi.fn>;
 }
 
 const auth = vi.hoisted((): AuthTestState => ({
@@ -27,6 +30,8 @@ const auth = vi.hoisted((): AuthTestState => ({
   profile: undefined,
   workspace: undefined,
   documents: undefined,
+  review: undefined,
+  offers: undefined,
   token: null,
   signIn: vi.fn(),
   signOut: vi.fn(),
@@ -37,6 +42,7 @@ const auth = vi.hoisted((): AuthTestState => ({
   resolveDuplicate: vi.fn(),
   retryValidation: vi.fn(),
   deleteRaw: vi.fn(),
+  confirmSchool: vi.fn(),
 }));
 
 vi.mock("convex/react", () => ({
@@ -52,6 +58,8 @@ vi.mock("convex/react", () => ({
       .join();
     if (name.startsWith("profiles:")) return auth.profile;
     if (name === "workspaces:getCurrent") return auth.workspace;
+    if (name === "offers:getReview") return auth.review;
+    if (name === "offers:listForWorkspace") return auth.offers;
     return auth.documents;
   },
   useMutation: (reference: object) => {
@@ -64,6 +72,7 @@ vi.mock("convex/react", () => ({
     if (name === "documents:finalizeUpload") return auth.finalizeUpload;
     if (name === "documents:resolveDuplicate") return auth.resolveDuplicate;
     if (name === "documents:deleteRaw") return auth.deleteRaw;
+    if (name === "offers:confirmSchool") return auth.confirmSchool;
     return auth.retryValidation;
   },
 }));
@@ -88,6 +97,8 @@ beforeEach(() => {
   auth.profile = undefined;
   auth.workspace = undefined;
   auth.documents = undefined;
+  auth.review = undefined;
+  auth.offers = undefined;
   auth.token = null;
   auth.signIn.mockReset();
   auth.signOut.mockReset();
@@ -98,6 +109,7 @@ beforeEach(() => {
   auth.resolveDuplicate.mockReset();
   auth.retryValidation.mockReset();
   auth.deleteRaw.mockReset();
+  auth.confirmSchool.mockReset();
 });
 
 afterEach(() => {
@@ -367,5 +379,81 @@ describe("private account routes", () => {
     );
 
     expect(auth.deleteRaw).toHaveBeenCalledWith({ documentId: "document-1" });
+  });
+
+  it("routes an extracted offer through explicit school confirmation", async () => {
+    const user = userEvent.setup();
+    auth.status = "signedIn";
+    auth.profile = { ageConfirmedAt: 1 };
+    auth.workspace = {
+      _id: "workspace-1",
+      name: "My offers",
+      generation: 0,
+    };
+    auth.review = {
+      offer: { _id: "offer-1", reviewState: "preliminary", revision: 0 },
+      school: {
+        _id: "school-1",
+        name: "Example University",
+        officialDomain: "example.edu",
+        identityState: "candidate",
+      },
+      candidates: [
+        {
+          _id: "school-1",
+          name: "Example University",
+          officialDomain: "example.edu",
+          identityState: "candidate",
+        },
+      ],
+      items: [],
+      rawDeletedAt: null,
+    };
+    auth.confirmSchool.mockResolvedValue({ status: "confirmed" });
+
+    renderRoute("/offers/offer-1/review");
+    await user.click(
+      await screen.findByRole("radio", { name: /Example University/ }),
+    );
+    await user.click(screen.getByRole("button", { name: "Confirm school" }));
+
+    expect(auth.confirmSchool).toHaveBeenCalledWith({
+      offerId: "offer-1",
+      schoolId: "school-1",
+    });
+  });
+
+  it("links a processed workspace document to its review flow", async () => {
+    auth.status = "signedIn";
+    auth.profile = { ageConfirmedAt: 1 };
+    auth.workspace = {
+      _id: "workspace-1",
+      name: "My offers",
+      generation: 0,
+    };
+    auth.documents = [
+      {
+        _id: "document-1",
+        fileName: "award.pdf",
+        mimeType: "application/pdf",
+        byteSize: 12,
+        processingState: "needs_school_confirmation",
+        rawState: "present",
+        updatedAt: 1,
+      },
+    ];
+    auth.offers = [
+      {
+        _id: "offer-1",
+        documentId: "document-1",
+        reviewState: "preliminary",
+      },
+    ];
+
+    renderRoute("/workspace");
+
+    expect(
+      await screen.findByRole("link", { name: "Confirm school for award.pdf" }),
+    ).toHaveAttribute("href", "/offers/offer-1/review");
   });
 });

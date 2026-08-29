@@ -136,6 +136,7 @@ export default defineSchema({
     supersededAt: v.optional(v.number()),
   })
     .index("by_workspaceId", ["workspaceId"])
+    .index("by_workspaceId_active", ["workspaceId", "active"])
     .index("by_schoolId_active", ["schoolId", "active"])
     .index("by_schoolId_version", ["schoolId", "version"])
     .index("by_documentId", ["documentId"]),
