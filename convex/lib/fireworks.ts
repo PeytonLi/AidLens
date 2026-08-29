@@ -4,6 +4,15 @@ import {
   type ExtractionResultV1,
 } from "../../src/domain/extraction";
 
+export function readFireworksConfig(
+  environment: Record<string, string | undefined>,
+) {
+  const apiKey = environment.FIREWORKS_API_KEY?.trim();
+  const model = environment.FIREWORKS_MODEL?.trim();
+  if (!apiKey || !model) throw new Error("FIREWORKS_NOT_CONFIGURED");
+  return { apiKey, model };
+}
+
 export function buildFireworksExtractionRequest({
   model,
   mimeType,

@@ -11,6 +11,7 @@
 import type * as auth from "../auth.js";
 import type * as crons from "../crons.js";
 import type * as documents from "../documents.js";
+import type * as fireworks from "../fireworks.js";
 import type * as http from "../http.js";
 import type * as lib_auth from "../lib/auth.js";
 import type * as lib_fileValidation from "../lib/fileValidation.js";
@@ -30,6 +31,7 @@ declare const fullApi: ApiFromModules<{
   auth: typeof auth;
   crons: typeof crons;
   documents: typeof documents;
+  fireworks: typeof fireworks;
   http: typeof http;
   "lib/auth": typeof lib_auth;
   "lib/fileValidation": typeof lib_fileValidation;

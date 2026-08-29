@@ -1,8 +1,22 @@
 import { describe, expect, it, vi } from "vitest";
 import {
   buildFireworksExtractionRequest,
+  readFireworksConfig,
   requestFireworksExtraction,
 } from "./fireworks";
+
+it("S5.1: requires server-side Fireworks configuration", () => {
+  expect(() => readFireworksConfig({})).toThrow("FIREWORKS_NOT_CONFIGURED");
+  expect(
+    readFireworksConfig({
+      FIREWORKS_API_KEY: "secret-test-key",
+      FIREWORKS_MODEL: "accounts/fireworks/models/kimi-k2p6",
+    }),
+  ).toEqual({
+    apiKey: "secret-test-key",
+    model: "accounts/fireworks/models/kimi-k2p6",
+  });
+});
 
 describe("buildFireworksExtractionRequest", () => {
   it("S5.1: builds a strict, tool-free vision extraction request", () => {
