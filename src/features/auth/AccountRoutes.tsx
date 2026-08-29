@@ -20,6 +20,7 @@ import OfferReviewPage, { type OfferReview } from "../review/OfferReviewPage";
 import ComparisonPage, {
   type ComparisonData,
 } from "../comparison/ComparisonPage";
+import ResearchPage from "../research/ResearchPage";
 
 const getCurrentProfile = makeFunctionReference<
   "query",
@@ -134,6 +135,19 @@ const updateComparisonSettings = makeFunctionReference<
     scenario: "conservative" | "optimistic";
   }
 >("offers:updateComparisonSettings");
+const getSchoolResearch = makeFunctionReference<
+  "query",
+  { schoolId: Id<"schools"> },
+  {
+    school: Doc<"schools">;
+    run: Doc<"researchRuns"> | null;
+    sources: Doc<"sources">[];
+  }
+>("research:getForSchool");
+const startSchoolResearch = makeFunctionReference<
+  "mutation",
+  { schoolId: Id<"schools"> }
+>("research:start");
 
 function usePrivatePreviews(documents: DocumentSummary[] | undefined) {
   const token = useAuthToken();
@@ -478,9 +492,16 @@ function WorkspacePage() {
               ? "Review offer from"
               : "View reviewed offer from";
         return (
-          <Link key={offer._id} to={`/offers/${offer._id}/review`}>
-            {action} {document.fileName}
-          </Link>
+          <span key={offer._id}>
+            <Link to={`/offers/${offer._id}/review`}>
+              {action} {document.fileName}
+            </Link>
+            {offer.schoolId ? (
+              <Link to={`/schools/${offer.schoolId}`}>
+                View official sources
+              </Link>
+            ) : null}
+          </span>
         );
       })}
       <Link to="/compare">Compare offers</Link>
@@ -539,6 +560,22 @@ function ComparisonRoute() {
   );
 }
 
+function ResearchRoute() {
+  const match = useLocation().pathname.match(/^\/schools\/([^/]+)$/);
+  const schoolId = match?.[1] as Id<"schools"> | undefined;
+  const data = useQuery(getSchoolResearch, schoolId ? { schoolId } : "skip");
+  const start = useMutation(startSchoolResearch);
+  if (!schoolId) return <Navigate to="/workspace" replace />;
+  if (data === undefined) return <SessionStatus />;
+  return (
+    <ResearchPage
+      schoolName={data.school.name}
+      data={data}
+      onStart={() => start({ schoolId })}
+    />
+  );
+}
+
 function OfferReviewRoute() {
   const match = useLocation().pathname.match(/^\/offers\/([^/]+)\/review$/);
   const id = match?.[1] as Id<"offers"> | undefined;
@@ -579,6 +616,7 @@ function PrivateRoute() {
   const { pathname } = useLocation();
   if (pathname === "/workspace") return <WorkspacePage />;
   if (pathname === "/compare") return <ComparisonRoute />;
+  if (/^\/schools\/[^/]+$/.test(pathname)) return <ResearchRoute />;
   if (/^\/offers\/[^/]+\/review$/.test(pathname)) return <OfferReviewRoute />;
   return (
     <main id="main" className="not-found-page">

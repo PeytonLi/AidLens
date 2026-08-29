@@ -146,6 +146,36 @@ export default defineSchema({
     scenario: v.union(v.literal("conservative"), v.literal("optimistic")),
     updatedAt: v.number(),
   }).index("by_workspaceId", ["workspaceId"]),
+  researchRuns: defineTable({
+    workspaceId: v.id("workspaces"),
+    schoolId: v.id("schools"),
+    generation: v.number(),
+    state: v.union(
+      v.literal("queued"),
+      v.literal("running"),
+      v.literal("succeeded"),
+      v.literal("failed"),
+      v.literal("unresolved"),
+    ),
+    failureCode: v.optional(v.string()),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_workspaceId", ["workspaceId"])
+    .index("by_schoolId_state", ["schoolId", "state"]),
+  sources: defineTable({
+    workspaceId: v.id("workspaces"),
+    schoolId: v.id("schools"),
+    researchRunId: v.id("researchRuns"),
+    kind: v.literal("official_page"),
+    url: v.string(),
+    title: v.string(),
+    excerpt: v.string(),
+    retrievedAt: v.number(),
+  })
+    .index("by_workspaceId", ["workspaceId"])
+    .index("by_schoolId", ["schoolId"])
+    .index("by_researchRunId", ["researchRunId"]),
   lineItems: defineTable({
     workspaceId: v.id("workspaces"),
     offerId: v.id("offers"),
