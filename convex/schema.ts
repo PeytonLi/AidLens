@@ -36,6 +36,15 @@ export default defineSchema({
     ageConfirmedAt: v.optional(v.number()),
     agentMailInboxId: v.optional(v.string()),
     agentMailInboxAddress: v.optional(v.string()),
+    agentMailProvisioningState: v.optional(
+      v.union(
+        v.literal("queued"),
+        v.literal("provisioning"),
+        v.literal("ready"),
+        v.literal("failed"),
+      ),
+    ),
+    agentMailProvisioningError: v.optional(v.string()),
     createdAt: v.number(),
     updatedAt: v.number(),
   })
@@ -176,6 +185,107 @@ export default defineSchema({
     .index("by_workspaceId", ["workspaceId"])
     .index("by_schoolId", ["schoolId"])
     .index("by_researchRunId", ["researchRunId"]),
+  agentMailWebhookEvents: defineTable({
+    workspaceId: v.id("workspaces"),
+    eventId: v.string(),
+    eventType: v.string(),
+    receivedAt: v.number(),
+  })
+    .index("by_workspaceId", ["workspaceId"])
+    .index("by_eventId", ["eventId"]),
+  mailMessages: defineTable({
+    workspaceId: v.id("workspaces"),
+    inboxId: v.string(),
+    providerMessageId: v.string(),
+    approvalId: v.optional(v.string()),
+    threadId: v.string(),
+    direction: v.union(v.literal("inbound"), v.literal("outbound")),
+    subject: v.string(),
+    bodyText: v.string(),
+    sender: v.string(),
+    deliveryState: v.union(
+      v.literal("received"),
+      v.literal("queued"),
+      v.literal("sent"),
+      v.literal("delivered"),
+      v.literal("failed"),
+    ),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_workspaceId", ["workspaceId"])
+    .index("by_inboxId_and_providerMessageId", ["inboxId", "providerMessageId"])
+    .index("by_approvalId", ["approvalId"])
+    .index("by_inboxId_and_threadId_and_direction", [
+      "inboxId",
+      "threadId",
+      "direction",
+    ]),
+  questions: defineTable({
+    workspaceId: v.id("workspaces"),
+    schoolId: v.id("schools"),
+    lineItemId: v.optional(v.id("lineItems")),
+    triggerCode: v.string(),
+    prompt: v.string(),
+    state: v.union(
+      v.literal("open"),
+      v.literal("drafting"),
+      v.literal("queued"),
+      v.literal("sent"),
+      v.literal("delivered"),
+      v.literal("reply_received"),
+      v.literal("awaiting_confirmation"),
+      v.literal("resolved"),
+      v.literal("partially_resolved"),
+    ),
+    revision: v.number(),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_workspaceId", ["workspaceId"])
+    .index("by_schoolId", ["schoolId"])
+    .index("by_lineItemId_triggerCode", ["lineItemId", "triggerCode"]),
+  mailDrafts: defineTable({
+    workspaceId: v.id("workspaces"),
+    questionId: v.id("questions"),
+    recipient: v.string(),
+    subject: v.string(),
+    bodyText: v.string(),
+    status: v.union(
+      v.literal("draft"),
+      v.literal("queued"),
+      v.literal("sent"),
+      v.literal("delivered"),
+      v.literal("failed"),
+    ),
+    revision: v.number(),
+    approvalId: v.optional(v.string()),
+    approvedBodyHash: v.optional(v.string()),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_workspaceId", ["workspaceId"])
+    .index("by_questionId", ["questionId"])
+    .index("by_approvalId", ["approvalId"]),
+  replyProposals: defineTable({
+    workspaceId: v.id("workspaces"),
+    questionId: v.id("questions"),
+    lineItemId: v.id("lineItems"),
+    messageId: v.id("mailMessages"),
+    supportingText: v.string(),
+    proposedRenewal: renewal,
+    state: v.union(
+      v.literal("pending"),
+      v.literal("confirmed"),
+      v.literal("rejected"),
+    ),
+    revision: v.number(),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_workspaceId", ["workspaceId"])
+    .index("by_questionId", ["questionId"])
+    .index("by_messageId", ["messageId"]),
   lineItems: defineTable({
     workspaceId: v.id("workspaces"),
     offerId: v.id("offers"),

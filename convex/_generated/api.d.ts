@@ -8,12 +8,15 @@
  * @module
  */
 
+import type * as agentMail from "../agentMail.js";
+import type * as agentMailActions from "../agentMailActions.js";
 import type * as auth from "../auth.js";
 import type * as crons from "../crons.js";
 import type * as documents from "../documents.js";
 import type * as extractions from "../extractions.js";
 import type * as fireworks from "../fireworks.js";
 import type * as http from "../http.js";
+import type * as lib_agentMail from "../lib/agentMail.js";
 import type * as lib_auth from "../lib/auth.js";
 import type * as lib_extractionPipeline from "../lib/extractionPipeline.js";
 import type * as lib_fileValidation from "../lib/fileValidation.js";
@@ -24,6 +27,7 @@ import type * as lib_pdfRendering from "../lib/pdfRendering.js";
 import type * as myFunctions from "../myFunctions.js";
 import type * as offers from "../offers.js";
 import type * as profiles from "../profiles.js";
+import type * as questions from "../questions.js";
 import type * as research from "../research.js";
 import type * as researchActions from "../researchActions.js";
 import type * as retention from "../retention.js";
@@ -36,12 +40,15 @@ import type {
 } from "convex/server";
 
 declare const fullApi: ApiFromModules<{
+  agentMail: typeof agentMail;
+  agentMailActions: typeof agentMailActions;
   auth: typeof auth;
   crons: typeof crons;
   documents: typeof documents;
   extractions: typeof extractions;
   fireworks: typeof fireworks;
   http: typeof http;
+  "lib/agentMail": typeof lib_agentMail;
   "lib/auth": typeof lib_auth;
   "lib/extractionPipeline": typeof lib_extractionPipeline;
   "lib/fileValidation": typeof lib_fileValidation;
@@ -52,6 +59,7 @@ declare const fullApi: ApiFromModules<{
   myFunctions: typeof myFunctions;
   offers: typeof offers;
   profiles: typeof profiles;
+  questions: typeof questions;
   research: typeof research;
   researchActions: typeof researchActions;
   retention: typeof retention;

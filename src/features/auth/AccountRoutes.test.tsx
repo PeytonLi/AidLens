@@ -6,13 +6,22 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 interface AuthTestState {
   status: "loading" | "signedOut" | "signedIn";
-  profile: undefined | null | { ageConfirmedAt?: number };
+  profile:
+    | undefined
+    | null
+    | {
+        ageConfirmedAt?: number;
+        agentMailProvisioningState?: string;
+        agentMailInboxAddress?: string;
+      };
   workspace:
     undefined | null | { _id: string; name: string; generation: number };
   documents: unknown[] | undefined;
   review: unknown;
   offers: unknown[] | undefined;
   comparison: unknown;
+  questions: unknown[] | undefined;
+  questionDraft: unknown;
   token: string | null;
   signIn: ReturnType<typeof vi.fn>;
   signOut: ReturnType<typeof vi.fn>;
@@ -25,6 +34,7 @@ interface AuthTestState {
   deleteRaw: ReturnType<typeof vi.fn>;
   confirmSchool: ReturnType<typeof vi.fn>;
   updateComparisonSettings: ReturnType<typeof vi.fn>;
+  retryInbox: ReturnType<typeof vi.fn>;
 }
 
 const auth = vi.hoisted((): AuthTestState => ({
@@ -35,6 +45,8 @@ const auth = vi.hoisted((): AuthTestState => ({
   review: undefined,
   offers: undefined,
   comparison: undefined,
+  questions: undefined,
+  questionDraft: undefined,
   token: null,
   signIn: vi.fn(),
   signOut: vi.fn(),
@@ -47,6 +59,7 @@ const auth = vi.hoisted((): AuthTestState => ({
   deleteRaw: vi.fn(),
   confirmSchool: vi.fn(),
   updateComparisonSettings: vi.fn(),
+  retryInbox: vi.fn(),
 }));
 
 vi.mock("convex/react", () => ({
@@ -65,12 +78,15 @@ vi.mock("convex/react", () => ({
     if (name === "offers:getReview") return auth.review;
     if (name === "offers:listForWorkspace") return auth.offers;
     if (name === "offers:getComparison") return auth.comparison;
+    if (name === "questions:listForWorkspace") return auth.questions;
+    if (name === "questions:getDraftPage") return auth.questionDraft;
     return auth.documents;
   },
   useMutation: (reference: object) => {
     const name = Object.getOwnPropertySymbols(reference)
       .map((symbol) => String(Reflect.get(reference, symbol)))
       .join();
+    if (name === "profiles:retryInboxProvisioning") return auth.retryInbox;
     if (name.startsWith("profiles:")) return auth.confirmAge;
     if (name === "workspaces:remove") return auth.removeWorkspace;
     if (name === "documents:generateUploadUrl") return auth.generateUploadUrl;
@@ -107,6 +123,8 @@ beforeEach(() => {
   auth.review = undefined;
   auth.offers = undefined;
   auth.comparison = undefined;
+  auth.questions = [];
+  auth.questionDraft = undefined;
   auth.token = null;
   auth.signIn.mockReset();
   auth.signOut.mockReset();
@@ -119,6 +137,7 @@ beforeEach(() => {
   auth.deleteRaw.mockReset();
   auth.confirmSchool.mockReset();
   auth.updateComparisonSettings.mockReset();
+  auth.retryInbox.mockReset();
 });
 
 afterEach(() => {
@@ -478,5 +497,25 @@ describe("private account routes", () => {
     renderRoute("/compare");
 
     expect(await screen.findByText("0 of 2 offers ready")).toBeVisible();
+  });
+
+  it("shows a retry when private forwarding inbox provisioning failed", async () => {
+    const user = userEvent.setup();
+    auth.status = "signedIn";
+    auth.profile = {
+      ageConfirmedAt: 1,
+      agentMailProvisioningState: "failed",
+    };
+    auth.workspace = { _id: "workspace-1", name: "My offers", generation: 0 };
+    auth.documents = [];
+    auth.offers = [];
+    auth.retryInbox.mockResolvedValue({ status: "scheduled" });
+
+    renderRoute("/workspace");
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "Email forwarding setup is unavailable",
+    );
+    await user.click(screen.getByRole("button", { name: "Retry inbox setup" }));
+    expect(auth.retryInbox).toHaveBeenCalledOnce();
   });
 });

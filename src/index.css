@@ -1017,6 +1017,36 @@ a:focus-visible,
   padding-block: clamp(2rem, 6vw, 5rem);
 }
 
+.question-draft-page {
+  width: min(100% - 2rem, 42rem);
+  margin-inline: auto;
+  padding-block: clamp(2rem, 6vw, 5rem);
+  display: grid;
+  gap: var(--space-4);
+}
+
+.question-draft-page label {
+  display: grid;
+  gap: var(--space-1);
+  font-weight: 650;
+}
+
+.question-draft-page input,
+.question-draft-page select,
+.question-draft-page textarea {
+  width: 100%;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-ink);
+  font: inherit;
+}
+
+.question-draft-page textarea {
+  min-height: 12rem;
+  resize: vertical;
+}
+
 .research-page {
   width: min(100% - 2rem, 52rem);
   margin-inline: auto;

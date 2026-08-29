@@ -315,6 +315,43 @@ export const confirmReviewed = mutation({
       safeMetadata: { reason: "required_fields_addressed" },
       createdAt: now,
     });
+    if (offer.schoolId) {
+      for (const item of items) {
+        if (
+          item.renewal.kind !== "unknown" ||
+          ![
+            "grant",
+            "scholarship",
+            "student_loan",
+            "parent_plus",
+            "private_loan",
+            "work_study",
+          ].includes(item.canonicalCategory)
+        )
+          continue;
+        const existingQuestion = await ctx.db
+          .query("questions")
+          .withIndex("by_lineItemId_triggerCode", (query) =>
+            query
+              .eq("lineItemId", item._id)
+              .eq("triggerCode", "unknown_renewal"),
+          )
+          .unique();
+        if (!existingQuestion) {
+          await ctx.db.insert("questions", {
+            workspaceId: offer.workspaceId,
+            schoolId: offer.schoolId,
+            lineItemId: item._id,
+            triggerCode: "unknown_renewal",
+            prompt: `What are the renewal terms for ${item.originalLabel}?`,
+            state: "open",
+            revision: 0,
+            createdAt: now,
+            updatedAt: now,
+          });
+        }
+      }
+    }
     return { status: "reviewed" as const, revision: offer.revision };
   },
 });

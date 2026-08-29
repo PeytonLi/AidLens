@@ -81,6 +81,10 @@ const updateComparisonSettings = makeFunctionReference<
     scenario: "conservative" | "optimistic";
   }
 >("offers:updateComparisonSettings");
+const listQuestions = makeFunctionReference<
+  "query",
+  { workspaceId: Id<"workspaces"> }
+>("questions:listForWorkspace");
 
 const extraction = {
   version: "v1" as const,
@@ -351,6 +355,15 @@ test("S5.2: a validated extraction commits cited preliminary facts atomically", 
     offer: { reviewState: "reviewed", revision: 1 },
     document: { processingState: "ready" },
   });
+  await expect(
+    owner.query(listQuestions, { workspaceId: ids.workspaceId }),
+  ).resolves.toEqual([
+    expect.objectContaining({
+      schoolId,
+      triggerCode: "unknown_renewal",
+      state: "open",
+    }),
+  ]);
   await expect(
     owner.query(getComparison, { workspaceId: ids.workspaceId }),
   ).resolves.toEqual({

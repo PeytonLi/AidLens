@@ -268,6 +268,11 @@ test("only an owner can choose a school and deletion cascades private children",
     settingsId,
     researchRunId,
     sourceId,
+    questionId,
+    draftId,
+    messageId,
+    proposalId,
+    webhookEventId,
   } = await t.run(async (ctx) => {
     const now = Date.now();
     const storageId = await ctx.storage.store(new Blob(["private offer"]));
@@ -357,6 +362,62 @@ test("only an owner can choose a school and deletion cascades private children",
       excerpt: "Official aid policy",
       retrievedAt: now,
     });
+    const questionId = await ctx.db.insert("questions", {
+      workspaceId: aliceIds.workspaceId,
+      schoolId: aliceSchoolId,
+      lineItemId,
+      triggerCode: "unknown_renewal",
+      prompt: "How long does this grant renew?",
+      state: "awaiting_confirmation",
+      revision: 0,
+      createdAt: now,
+      updatedAt: now,
+    });
+    const draftId = await ctx.db.insert("mailDrafts", {
+      workspaceId: aliceIds.workspaceId,
+      questionId,
+      recipient: "aid@example.edu",
+      subject: "Renewal",
+      bodyText: "How long does this grant renew?",
+      status: "sent",
+      revision: 1,
+      approvalId: "approval-delete-fixture",
+      approvedBodyHash: "hash",
+      createdAt: now,
+      updatedAt: now,
+    });
+    const messageId = await ctx.db.insert("mailMessages", {
+      workspaceId: aliceIds.workspaceId,
+      inboxId: "inbox-delete-fixture",
+      providerMessageId: "message-delete-fixture",
+      approvalId: "approval-delete-fixture",
+      threadId: "thread-delete-fixture",
+      direction: "inbound",
+      subject: "Re: Renewal",
+      bodyText: "Four years.",
+      sender: "aid@example.edu",
+      deliveryState: "received",
+      createdAt: now,
+      updatedAt: now,
+    });
+    const proposalId = await ctx.db.insert("replyProposals", {
+      workspaceId: aliceIds.workspaceId,
+      questionId,
+      lineItemId,
+      messageId,
+      supportingText: "Four years.",
+      proposedRenewal: { kind: "fixed", durationYears: 4 },
+      state: "pending",
+      revision: 0,
+      createdAt: now,
+      updatedAt: now,
+    });
+    const webhookEventId = await ctx.db.insert("agentMailWebhookEvents", {
+      workspaceId: aliceIds.workspaceId,
+      eventId: "event-delete-fixture",
+      eventType: "message.received",
+      receivedAt: now,
+    });
     return {
       storageId,
       documentId,
@@ -366,6 +427,11 @@ test("only an owner can choose a school and deletion cascades private children",
       settingsId,
       researchRunId,
       sourceId,
+      questionId,
+      draftId,
+      messageId,
+      proposalId,
+      webhookEventId,
     };
   });
 
@@ -394,6 +460,21 @@ test("only an owner can choose a school and deletion cascades private children",
   ).resolves.toBeNull();
   await expect(
     t.run((ctx) => ctx.db.get("sources", sourceId)),
+  ).resolves.toBeNull();
+  await expect(
+    t.run((ctx) => ctx.db.get("questions", questionId)),
+  ).resolves.toBeNull();
+  await expect(
+    t.run((ctx) => ctx.db.get("mailDrafts", draftId)),
+  ).resolves.toBeNull();
+  await expect(
+    t.run((ctx) => ctx.db.get("mailMessages", messageId)),
+  ).resolves.toBeNull();
+  await expect(
+    t.run((ctx) => ctx.db.get("replyProposals", proposalId)),
+  ).resolves.toBeNull();
+  await expect(
+    t.run((ctx) => ctx.db.get("agentMailWebhookEvents", webhookEventId)),
   ).resolves.toBeNull();
   await expect(t.run((ctx) => ctx.storage.get(storageId))).resolves.toBeNull();
 });

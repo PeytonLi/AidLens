@@ -95,6 +95,93 @@ export const continueRemoval = internalMutation({
       return false;
     }
 
+    const replyProposals = await ctx.db
+      .query("replyProposals")
+      .withIndex("by_workspaceId", (query) =>
+        query.eq("workspaceId", workspaceId),
+      )
+      .take(DELETE_BATCH_SIZE);
+    if (replyProposals.length) {
+      await Promise.all(
+        replyProposals.map(({ _id }) => ctx.db.delete("replyProposals", _id)),
+      );
+      await ctx.scheduler.runAfter(0, continueRemovalRef, {
+        workspaceId,
+        generation,
+      });
+      return false;
+    }
+
+    const mailDrafts = await ctx.db
+      .query("mailDrafts")
+      .withIndex("by_workspaceId", (query) =>
+        query.eq("workspaceId", workspaceId),
+      )
+      .take(DELETE_BATCH_SIZE);
+    if (mailDrafts.length) {
+      await Promise.all(
+        mailDrafts.map(({ _id }) => ctx.db.delete("mailDrafts", _id)),
+      );
+      await ctx.scheduler.runAfter(0, continueRemovalRef, {
+        workspaceId,
+        generation,
+      });
+      return false;
+    }
+
+    const mailMessages = await ctx.db
+      .query("mailMessages")
+      .withIndex("by_workspaceId", (query) =>
+        query.eq("workspaceId", workspaceId),
+      )
+      .take(DELETE_BATCH_SIZE);
+    if (mailMessages.length) {
+      await Promise.all(
+        mailMessages.map(({ _id }) => ctx.db.delete("mailMessages", _id)),
+      );
+      await ctx.scheduler.runAfter(0, continueRemovalRef, {
+        workspaceId,
+        generation,
+      });
+      return false;
+    }
+
+    const webhookEvents = await ctx.db
+      .query("agentMailWebhookEvents")
+      .withIndex("by_workspaceId", (query) =>
+        query.eq("workspaceId", workspaceId),
+      )
+      .take(DELETE_BATCH_SIZE);
+    if (webhookEvents.length) {
+      await Promise.all(
+        webhookEvents.map(({ _id }) =>
+          ctx.db.delete("agentMailWebhookEvents", _id),
+        ),
+      );
+      await ctx.scheduler.runAfter(0, continueRemovalRef, {
+        workspaceId,
+        generation,
+      });
+      return false;
+    }
+
+    const questions = await ctx.db
+      .query("questions")
+      .withIndex("by_workspaceId", (query) =>
+        query.eq("workspaceId", workspaceId),
+      )
+      .take(DELETE_BATCH_SIZE);
+    if (questions.length) {
+      await Promise.all(
+        questions.map(({ _id }) => ctx.db.delete("questions", _id)),
+      );
+      await ctx.scheduler.runAfter(0, continueRemovalRef, {
+        workspaceId,
+        generation,
+      });
+      return false;
+    }
+
     const lineItems = await ctx.db
       .query("lineItems")
       .withIndex("by_workspaceId", (query) =>

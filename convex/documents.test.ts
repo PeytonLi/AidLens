@@ -154,8 +154,9 @@ test("S5 pipeline: successful validation schedules one extraction job", async ()
   const jobs = await t.run((ctx) =>
     ctx.db.system.query("_scheduled_functions").collect(),
   );
-  expect(jobs).toHaveLength(1);
-  expect(jobs[0].args[0]).toMatchObject({
+  const documentJobs = jobs.filter(({ args }) => !("profileId" in args[0]));
+  expect(documentJobs).toHaveLength(1);
+  expect(documentJobs[0].args[0]).toMatchObject({
     workspaceId,
     workspaceGeneration: 0,
     documentId,
@@ -273,7 +274,11 @@ test("concurrent duplicate finalization creates one document and one validation 
     alice.query(listDocuments, { workspaceId }),
   ).resolves.toHaveLength(1);
   await expect(
-    t.run((ctx) => ctx.db.system.query("_scheduled_functions").collect()),
+    t.run(async (ctx) =>
+      (await ctx.db.system.query("_scheduled_functions").collect()).filter(
+        ({ args }) => !("profileId" in args[0]),
+      ),
+    ),
   ).resolves.toHaveLength(2);
 });
 
@@ -692,7 +697,11 @@ test("finalization schedules byte validation and valid content advances reactive
       alice.query(getDocument, { documentId: created.documentId }),
     ).resolves.toMatchObject({ processingState: "received" });
     await expect(
-      t.run((ctx) => ctx.db.system.query("_scheduled_functions").collect()),
+      t.run(async (ctx) =>
+        (await ctx.db.system.query("_scheduled_functions").collect()).filter(
+          ({ args }) => !("profileId" in args[0]),
+        ),
+      ),
     ).resolves.toHaveLength(1);
     await t.finishAllScheduledFunctions(() => vi.runAllTimers());
     await expect(

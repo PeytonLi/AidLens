@@ -21,6 +21,9 @@ import ComparisonPage, {
   type ComparisonData,
 } from "../comparison/ComparisonPage";
 import ResearchPage from "../research/ResearchPage";
+import QuestionDraftPage, {
+  type QuestionDraftData,
+} from "../questions/QuestionDraftPage";
 
 const getCurrentProfile = makeFunctionReference<
   "query",
@@ -32,6 +35,11 @@ const confirmAge = makeFunctionReference<
   { confirmed: boolean },
   { profileId: Id<"profiles">; workspaceId: Id<"workspaces"> }
 >("profiles:confirmAge");
+const retryInboxProvisioning = makeFunctionReference<
+  "mutation",
+  Record<string, never>,
+  { status: "scheduled" | "ready" | "active" }
+>("profiles:retryInboxProvisioning");
 const getCurrentWorkspace = makeFunctionReference<
   "query",
   Record<string, never>,
@@ -148,6 +156,49 @@ const startSchoolResearch = makeFunctionReference<
   "mutation",
   { schoolId: Id<"schools"> }
 >("research:start");
+const listQuestions = makeFunctionReference<
+  "query",
+  { workspaceId: Id<"workspaces"> },
+  Doc<"questions">[]
+>("questions:listForWorkspace");
+const getQuestionDraftPage = makeFunctionReference<
+  "query",
+  { questionId: Id<"questions"> },
+  QuestionDraftData
+>("questions:getDraftPage");
+const openQuestionDraft = makeFunctionReference<
+  "mutation",
+  { questionId: Id<"questions"> }
+>("questions:openDraft");
+const saveQuestionDraft = makeFunctionReference<
+  "mutation",
+  {
+    draftId: Id<"mailDrafts">;
+    expectedRevision: number;
+    recipient: string;
+    subject: string;
+    bodyText: string;
+  },
+  { revision: number }
+>("questions:saveDraft");
+const approveQuestionDraft = makeFunctionReference<
+  "mutation",
+  {
+    draftId: Id<"mailDrafts">;
+    expectedRevision: number;
+    offDomainConfirmed: boolean;
+  }
+>("questions:approveDraft");
+const confirmQuestionReply = makeFunctionReference<
+  "mutation",
+  {
+    proposalId: Id<"replyProposals">;
+    expectedProposalRevision: number;
+    expectedQuestionRevision: number;
+    expectedLineItemRevision: number;
+    renewal: Doc<"lineItems">["renewal"];
+  }
+>("questions:confirmReply");
 
 function usePrivatePreviews(documents: DocumentSummary[] | undefined) {
   const token = useAuthToken();
@@ -327,6 +378,7 @@ function WorkspacePage() {
   const navigate = useNavigate();
   const { signOut } = useAuthActions();
   const workspace = useQuery(getCurrentWorkspace, {});
+  const profile = useQuery(getCurrentProfile, {});
   const remove = useMutation(removeWorkspace);
   const documents = useQuery(
     listDocuments,
@@ -336,15 +388,21 @@ function WorkspacePage() {
     listOffers,
     workspace ? { workspaceId: workspace._id } : "skip",
   );
+  const questions = useQuery(
+    listQuestions,
+    workspace ? { workspaceId: workspace._id } : "skip",
+  );
   const createUploadUrl = useMutation(generateUploadUrl);
   const finalize = useMutation(finalizeUpload);
   const resolve = useMutation(resolveDuplicate);
   const retry = useMutation(retryValidation);
   const removeRaw = useMutation(deleteRaw);
+  const retryInbox = useMutation(retryInboxProvisioning);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [uploadError, setUploadError] = useState<string | null>(null);
+  const [inboxRetrying, setInboxRetrying] = useState(false);
   const [duplicate, setDuplicate] = useState<{
     existingDocumentId: Id<"offerDocuments">;
     storageId: Id<"_storage">;
@@ -505,7 +563,32 @@ function WorkspacePage() {
         );
       })}
       <Link to="/compare">Compare offers</Link>
-      <p>Email forwarding will be available soon.</p>
+      {(questions ?? []).map((question) => (
+        <Link key={question._id} to={`/questions/${question._id}/draft`}>
+          Clarify: {question.prompt}
+        </Link>
+      ))}
+      {profile?.agentMailProvisioningState === "ready" ? (
+        <p>Forward offers to {profile.agentMailInboxAddress}</p>
+      ) : profile?.agentMailProvisioningState === "failed" ? (
+        <section aria-label="Email forwarding">
+          <p role="alert">
+            Email forwarding setup is unavailable. Your uploads still work.
+          </p>
+          <button
+            type="button"
+            disabled={inboxRetrying}
+            onClick={() => {
+              setInboxRetrying(true);
+              void retryInbox({}).finally(() => setInboxRetrying(false));
+            }}
+          >
+            {inboxRetrying ? "Retrying…" : "Retry inbox setup"}
+          </button>
+        </section>
+      ) : (
+        <p role="status">Setting up private email forwarding…</p>
+      )}
       <button type="button" onClick={() => void signOut()}>
         Sign out
       </button>
@@ -576,6 +659,44 @@ function ResearchRoute() {
   );
 }
 
+function QuestionDraftRoute() {
+  const match = useLocation().pathname.match(/^\/questions\/([^/]+)\/draft$/);
+  const questionId = match?.[1] as Id<"questions"> | undefined;
+  const data = useQuery(
+    getQuestionDraftPage,
+    questionId ? { questionId } : "skip",
+  );
+  const open = useMutation(openQuestionDraft);
+  const save = useMutation(saveQuestionDraft);
+  const approve = useMutation(approveQuestionDraft);
+  const confirmReply = useMutation(confirmQuestionReply);
+  if (!questionId) return <Navigate to="/workspace" replace />;
+  if (data === undefined) return <SessionStatus />;
+  return (
+    <QuestionDraftPage
+      data={data}
+      onOpen={() => open({ questionId })}
+      onSave={(draft) => {
+        if (!data.draft) throw new Error("Draft not created");
+        return save({ draftId: data.draft._id as Id<"mailDrafts">, ...draft });
+      }}
+      onApprove={(approval) => {
+        if (!data.draft) throw new Error("Draft not created");
+        return approve({
+          draftId: data.draft._id as Id<"mailDrafts">,
+          ...approval,
+        });
+      }}
+      onConfirmReply={(confirmation) =>
+        confirmReply({
+          ...confirmation,
+          proposalId: confirmation.proposalId as Id<"replyProposals">,
+        })
+      }
+    />
+  );
+}
+
 function OfferReviewRoute() {
   const match = useLocation().pathname.match(/^\/offers\/([^/]+)\/review$/);
   const id = match?.[1] as Id<"offers"> | undefined;
@@ -617,6 +738,8 @@ function PrivateRoute() {
   if (pathname === "/workspace") return <WorkspacePage />;
   if (pathname === "/compare") return <ComparisonRoute />;
   if (/^\/schools\/[^/]+$/.test(pathname)) return <ResearchRoute />;
+  if (/^\/questions\/[^/]+\/draft$/.test(pathname))
+    return <QuestionDraftRoute />;
   if (/^\/offers\/[^/]+\/review$/.test(pathname)) return <OfferReviewRoute />;
   return (
     <main id="main" className="not-found-page">
