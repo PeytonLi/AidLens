@@ -95,7 +95,7 @@ function AppShell({ children }: { children: ReactNode }) {
             data or recommends a school.
           </p>
           <p id="service-providers" className="sponsors">
-            Built with Convex · OpenAI · Firecrawl · AgentMail
+            Built with Convex · Fireworks AI · Firecrawl · AgentMail
           </p>
         </div>
       </footer>

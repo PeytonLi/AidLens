@@ -24,7 +24,7 @@ Ship a public `convex.site` app where:
 - React + Vite + TypeScript frontend.
 - Convex for auth, database, files, reactive state, HTTP endpoints, schedules, and durable work.
 - Convex Auth with email and password for the MVP. This avoids adding another vendor solely for magic links.
-- OpenAI Responses API with strict JSON Schema outputs.
+- Fireworks AI's OpenAI-compatible Chat Completions API with strict `json_schema` outputs and vision page images.
 - Firecrawl for targeted official-domain search and scrape.
 - AgentMail for forwarding inboxes and approved school threads.
 - Vitest for pure logic, React behavior, and Convex function tests.
@@ -82,7 +82,7 @@ Convex functions ---- ownership guard on every private operation
   |
   +--> durable processing workflow
          |
-         +--> OpenAI action ------> strict offer extraction
+         +--> Fireworks action ---> strict offer extraction
          |
          +--> Firecrawl action ---> official pages + citations
          |
@@ -155,7 +155,7 @@ Tests verify behavior, not internal function calls. External vendors are replace
 | React behavior | Vitest + jsdom + Testing Library | What the user sees, edits, approves, retries, and cannot submit. |
 | AI quality | Fixture-based eval tests | Required schema, category accuracy, source evidence, refusal to guess, prompt-injection resistance. |
 | Browser flow | Playwright, Chromium | Public sample, private upload/review/compare, approval safety, deletion. |
-| Live integration smoke | Manual or explicit non-CI command | Real OpenAI, Firecrawl, AgentMail, Convex workflow, and deployed webhook behavior. |
+| Live integration smoke | Manual or explicit non-CI command | Real Fireworks AI, Firecrawl, AgentMail, Convex workflow, and deployed webhook behavior. |
 
 `convex-test` does not run Node-only Convex actions faithfully. Test the deterministic code and database transitions locally; cover Node actions with mocked fetch contract tests plus one development-deployment smoke test.
 
@@ -295,7 +295,7 @@ Add behaviors one at a time:
 - Playwright uploads a fixture and sees status without arbitrary sleeps.
 - Storage URLs are never placed in public query results.
 
-### Slice 5: OpenAI extraction and human review
+### Slice 5: Fireworks AI extraction and human review
 
 **User-visible result:** The uploaded offer becomes a source-backed editable review screen.
 
@@ -315,7 +315,7 @@ Add behaviors one at a time:
 
 **GREEN**
 
-- Add a single OpenAI action using the Responses API and strict JSON Schema.
+- Add a single Fireworks AI action using its OpenAI-compatible Chat Completions API, vision page images, and strict `json_schema` output. Render PDF pages to images before inference because direct document inlining is unsupported.
 - Persist only after schema validation.
 - Build document/field review with edit-and-confirm behavior.
 - Add an eval corpus of at least three synthetic formats: clear table, ambiguous prose, and misleading loan/work-study presentation.
@@ -379,7 +379,7 @@ Add behaviors one at a time:
 
 - Add one targeted Firecrawl action with a strict page limit and allowed-domain validation.
 - Render live research progress and citations.
-- Generate questions from deterministic triggers; OpenAI only phrases them.
+- Generate questions from deterministic triggers; Fireworks AI only phrases them.
 
 **Exit checks**
 
@@ -462,7 +462,7 @@ CODE PATHS
   +-- first event / duplicate event
   +-- retained file / immediate deletion / scheduled deletion
 
-[EVAL] OpenAI extraction and reply parsing
+[EVAL] Fireworks AI extraction and reply parsing
   +-- clear / ambiguous / misleading / malformed / injected input
   +-- schema valid / retryable invalid / permanent failure
 
@@ -491,7 +491,7 @@ No path above is complete until its failure state is both tested and visible to 
 | Upload | Unsupported, oversized, encrypted, or interrupted file | Validation and upload-flow tests | Reject or retry without starting workflow | Specific corrective message |
 | Workflow | Same upload/message schedules twice | Idempotency test | Unique event/document key | One processing card |
 | Storage cleanup | Schedule runs after file already deleted | Scheduled mutation test | Idempotent no-op plus audit | No error interruption |
-| OpenAI | Timeout or schema-invalid output | Contract/eval test | One retry, then failed state | Retry action and unchanged facts |
+| Fireworks AI | Timeout or schema-invalid output | Contract/eval test | One retry, then failed state | Retry action and unchanged facts |
 | Extraction | Loan classified as grant | Golden fixture eval | User review plus category correction | Low-confidence flag and source |
 | Comparison | Missing cost treated as zero | Pure domain test | Incomplete total | Unknown row and explanation |
 | Firecrawl | Lookalike or unofficial domain returned | Allowed-domain contract test | Reject as authority | Unresolved question |
@@ -510,7 +510,7 @@ Critical silent gaps allowed: **zero**.
 - Public sample interactive target: under 2 seconds on a normal broadband connection after deployment warm-up.
 - Private workspace initial query: one owner-scoped aggregate query, not one query per school row.
 - Comparison calculation: client or server pure computation over at most four offers; no caching layer needed.
-- OpenAI: one extraction call per accepted document version.
+- Fireworks AI: one extraction call per accepted document version.
 - Firecrawl: targeted search plus a small page cap per school; cache citations by school URL and retrieval date.
 - AgentMail: webhook-driven updates; no inbox polling loop.
 - Raw document bodies and full crawled pages are not copied into Convex documents; persist only required excerpts and metadata.
@@ -577,7 +577,7 @@ Do not move to the next checkpoint with a RED test, broken deployment, or known 
 
 1. **Hackathon registration:** confirmation that registration is complete so the project is eligible and Firecrawl credits are available.
 2. **Convex account/project access:** a development and production deployment, or authorization for the build agent to create them.
-3. **OpenAI API key with billing enabled:** stored locally and in Convex environment variables, never pasted into source files or chat.
+3. **Fireworks AI API key with credits enabled:** stored locally and in Convex environment variables, never pasted into source files or chat.
 4. **Firecrawl API key/credits:** from the registered hackathon account.
 5. **AgentMail API key/account:** with permission to create inboxes and webhooks.
 6. **GitHub destination:** complete — public repository created at `https://github.com/PeytonLi/AidLens` and connected as `origin`.
@@ -858,11 +858,11 @@ Rules:
 
 - Start the money engine in one `comparison.ts` file. Split it only after concrete duplication or file complexity appears.
 - Create a helper in `convex/lib` only after it has multiple callers, except the ownership guard and transition validator, which are cross-cutting security boundaries from their first use.
-- Do not create vendor interfaces with one implementation. Export concrete OpenAI, Firecrawl, and AgentMail functions.
+- Do not create vendor interfaces with one implementation. Export concrete Fireworks AI, Firecrawl, and AgentMail functions.
 - Do not persist calculated comparison totals. Persist facts and assumptions; derive totals through the pure domain engine so every reactive update uses one source of truth.
 - Do not create a separate repository, service, controller, DTO, or queue layer around Convex.
 - Use the routing facility already present in the official scaffold; if none exists, add `react-router-dom` as the single routing dependency rather than implementing a custom router for ten routes.
-- Use Convex validators for Convex function boundaries. Use one runtime schema source for OpenAI structured output; if the scaffold/OpenAI SDK does not already supply one, add `zod` and no second general validation library.
+- Use Convex validators for Convex function boundaries. Use one runtime schema source for Fireworks AI structured output; if the existing stack does not already supply one, add `zod` and no second general validation library.
 - Use native `fetch` for Firecrawl and AgentMail unless their required official package demonstrably removes more code than it adds. Use the official `svix` verifier for AgentMail signatures rather than implementing cryptography.
 - Add dependencies only in the slice that first exercises them with a failing test.
 
@@ -1053,7 +1053,7 @@ Use basis points rather than floating-point percentages in persistence. The defa
 Fields:
 
 - `workspaceId`
-- `actor: system | user | openai | firecrawl | agentmail | school_reply`
+- `actor: system | user | fireworks | firecrawl | agentmail | school_reply`
 - `eventType`
 - related entity IDs
 - fixed allowlisted safe metadata only
@@ -1208,7 +1208,7 @@ There is no restore path in the MVP.
 
 Concrete provider functions are allowed; generic adapter interfaces are not.
 
-### 24.1 OpenAI
+### 24.1 Fireworks AI
 
 Functions:
 
@@ -1220,11 +1220,11 @@ extractReply(messageId) -> ProposedReplyFactsV1
 
 Contract:
 
-- Use the Responses API.
-- Send PDF as `input_file`; send JPEG/PNG as `input_image` from a server-side action.
+- Use Fireworks AI's OpenAI-compatible Chat Completions API.
+- Send JPEG/PNG as vision image content from a server-side action. Render every PDF page to an image first because Fireworks AI does not support direct document inlining; preserve page numbers for evidence citations.
 - Do not expose a Convex storage bearer URL to the browser. If a provider URL is required, use a short-lived server-authorized path or provider file and delete it after use.
-- Freeze one `OPENAI_MODEL` environment value for the MVP and log only model name, response ID, timing, token counts, and safe status.
-- Use `text.format.type = json_schema`, a versioned schema name, `strict: true`, all properties required, `additionalProperties: false`, and explicit nullable/unknown values.
+- Freeze one `FIREWORKS_MODEL` environment value for the MVP and log only model name, response ID, timing, token counts, and safe status.
+- Use `response_format.type = json_schema`, a versioned schema name, strict JSON Schema, all properties required, `additionalProperties: false`, and explicit nullable/unknown values.
 - Validate parsed output again at the persistence boundary.
 - Detect refusal, incomplete status/reason, absent output, and schema failure before any authoritative persistence.
 - The model returns facts, categories, confidence, and evidence only. It never returns authoritative totals, status transitions, recipients, tool calls, or send instructions.
@@ -1316,7 +1316,7 @@ All committed fixtures are fictional, visibly marked `synthetic: true`, and cont
 
 Do not commit a large oversized binary; generate it during the test.
 
-### 25.3 OpenAI fixtures
+### 25.3 Fireworks AI fixtures
 
 - valid clear extraction
 - ambiguous extraction with unknown amount
@@ -1370,13 +1370,13 @@ Lock these script names in `package.json`; implementation details may follow the
 | `pnpm test:domain` | Pure comparison/state tests in Node | None |
 | `pnpm test:react` | React behavior tests in jsdom | None |
 | `pnpm test:convex` | `convex-test` queries/mutations/schedules | None |
-| `pnpm test:contract` | OpenAI/Firecrawl/AgentMail request-response fixtures | None |
+| `pnpm test:contract` | Fireworks AI/Firecrawl/AgentMail request-response fixtures | None |
 | `pnpm test:eval` | Deterministic extraction/reply fixture evaluation | None |
 | `pnpm test` | All non-browser, non-live suites | None |
 | `pnpm e2e` | Critical Chromium journeys | Local/development fixture endpoints only |
 | `pnpm e2e:sample` | Public sample journey | None beyond local server |
 | `pnpm check` | format, typecheck, lint, test, build | None |
-| `pnpm smoke:openai` | One synthetic document through the real API | Explicit opt-in |
+| `pnpm smoke:fireworks` | One synthetic document through the real API | Explicit opt-in |
 | `pnpm smoke:firecrawl` | UCSD/Loyola official pages | Explicit opt-in |
 | `pnpm smoke:agentmail` | Controlled inbox send/reply | Explicit opt-in |
 | `pnpm smoke:convex` | Storage, scheduler, auth, deployed HTTP routes | Explicit opt-in |
@@ -1528,7 +1528,7 @@ The workspace initially shows inbox provisioning as unavailable/pending until Sl
 
 **Exit gate:** ingestion/retention/security tests, upload React tests, private-ingestion E2E, `pnpm smoke:convex`, and full gate pass. Extend workspace cascade to documents/storage. Commit: `feat: add secure offer ingestion and retention`.
 
-### Slice 5 — OpenAI extraction and user-reviewed facts
+### Slice 5 — Fireworks AI extraction and user-reviewed facts
 
 **Goal:** A document produces validated, cited, editable facts; model failure never creates partial authority.
 
@@ -1548,7 +1548,7 @@ The workspace initially shows inbox provisioning as unavailable/pending until Sl
 - **S5.12:** Raw-file deletion after extraction leaves retained evidence excerpts and a clear deletion date.
 - **S5.13:** Review focus, source fallback, unknown values, errors, unsaved-change warning, zoom, mobile, and axe checks pass.
 
-Run deterministic fixtures first. After they are green and credentials exist, `pnpm smoke:openai` processes one synthetic PDF. A separate opt-in live evaluation reports field-level accuracy; it is not ordinary CI.
+Run deterministic fixtures first. After they are green and credentials exist, `pnpm smoke:fireworks` renders and processes one synthetic PDF. A separate opt-in live evaluation reports field-level accuracy; it is not ordinary CI.
 
 **Exit gate:** extraction contracts/evals, review behavior, stale-write/security tests, live synthetic smoke, and full gate pass. Extend workspace cascade to offers/line items. Commit: `feat: add source-backed offer review`.
 
@@ -1588,7 +1588,7 @@ The private UI calls the same `calculateComparison` function and uses the same c
 - **S7.6:** Duplicate research start returns the active run; stale/deleted run cannot commit.
 - **S7.7:** Timeout, block, credits/rate limit, no page, and conflicting/stale evidence produce explicit retry/manual-URL/unresolved states.
 - **S7.8:** Deterministic triggers create questions for missing required cost, ambiguous loan/work-study, unknown renewal, unclear period, component mismatch, assumption mismatch, missing/conflicting deadline, and source conflict.
-- **S7.9:** OpenAI may phrase a question from verified facts but cannot decide whether a trigger exists.
+- **S7.9:** Fireworks AI may phrase a question from verified facts but cannot decide whether a trigger exists.
 - **S7.10:** Source and question screens distinguish document, official page, government context, user correction, and school reply.
 - **S7.11:** Keyboard, external-link warning, focus, live progress, empty/failure state, mobile, and axe checks pass.
 
@@ -1664,7 +1664,7 @@ Automated tests use signed synthetic fixtures and a deterministic send endpoint.
 - public `convex.site` URL
 - public GitHub repository with no secrets/PII
 - complete `README.md`
-- `hackathon.md` describing substantive Convex, OpenAI, Firecrawl, and AgentMail use
+- `hackathon.md` describing substantive Convex, Fireworks AI, Firecrawl, and AgentMail use
 - sub-three-minute demo video following the PRD flow
 - founder-selected LinkedIn or X post tagging all sponsors
 - submission with repo, URL, and video before September 22 at 12:00 PM PT
@@ -1758,8 +1758,8 @@ Local generated and uncommitted values:
 Convex deployment environment:
 
 - exact auth secrets required by the selected official Convex Auth scaffold
-- `OPENAI_API_KEY`
-- `OPENAI_MODEL`
+- `FIREWORKS_API_KEY`
+- `FIREWORKS_MODEL`
 - `FIRECRAWL_API_KEY`
 - `FIRECRAWL_WEBHOOK_SECRET` if the selected component/webhook mode uses it
 - `AGENTMAIL_API_KEY`
@@ -1794,7 +1794,7 @@ Run in this order:
 10. From Slice 2 onward, run `pnpm e2e:sample` against the CI web server.
 11. From Slice 6 onward, run the deterministic private critical paths against fixture provider endpoints.
 
-No pull-request job calls OpenAI, Firecrawl, AgentMail, College Scorecard, or a production deployment.
+No pull-request job calls Fireworks AI, Firecrawl, AgentMail, College Scorecard, or a production deployment.
 
 ### 29.3 Main deployment
 
@@ -1808,7 +1808,7 @@ No pull-request job calls OpenAI, Firecrawl, AgentMail, College Scorecard, or a 
 
 | Smoke | Synthetic input | Required proof | Cleanup |
 |---|---|---|---|
-| OpenAI | One fictional offer PDF | Valid strict extraction, evidence, unknown handling, no tool/action output | Delete provider file if created and local raw file when requested. |
+| Fireworks AI | One fictional offer PDF rendered to page images | Valid strict extraction, evidence, unknown handling, no tool/action output | Delete rendered images and local raw file when requested. |
 | Firecrawl | UCSD and Loyola official URLs only | Domain restriction, scraped excerpt, retrieval metadata, clear blocked/no-page state | Remove temporary research run if not part of demo fixture. |
 | AgentMail | Founder-controlled inbox and recipient | Provision, approved send, delivery state, inbound reply, proposal-only update | Delete temporary inbox/webhook when supported. |
 | Convex | Synthetic account/workspace/files | Auth boundary, reactive state, private file path, scheduler cleanup, full deletion | Delete smoke workspace and verify absence. |
@@ -1817,7 +1817,7 @@ No pull-request job calls OpenAI, Firecrawl, AgentMail, College Scorecard, or a 
 
 | Boundary | Retry automatically | Do not retry automatically |
 |---|---|---|
-| OpenAI | timeout, 429, 5xx once; one explicit corrective schema retry | refusal, auth/payment/other permanent 4xx |
+| Fireworks AI | timeout, 429, 5xx once; one explicit corrective schema retry | refusal, auth/payment/other permanent 4xx |
 | Firecrawl | 408, 429 with `Retry-After`, 5xx with bounded backoff | 400, 401, 402, 403, 404, 409, 413 |
 | AgentMail send | provider/component bounded transient retry under same approval key | recipient/content/auth rejection without new user action |
 | Webhooks | Provider may redeliver; app deduplicates | App never recursively retries an invalid signature |
@@ -1836,7 +1836,7 @@ The provider SDK's internal retry count must be known and configured so it canno
 | Forwarded offers | Slice 8A | Signed webhook and shared-ingestion equivalence tests |
 | Seven-day/immediate raw deletion | Slice 4 onward | Scheduler, idempotency, storage smoke, deletion E2E |
 | School identity/official domain | Slices 5 and 7 | Candidate/confirmation and URL adversarial tests |
-| Strict source-backed extraction | Slice 5 | OpenAI contract/eval tests and live synthetic smoke |
+| Strict source-backed extraction | Slice 5 | Fireworks AI contract/eval tests and live synthetic smoke |
 | User review/correction/versioning | Slice 5 | React behavior and revision-safe Convex tests |
 | Two-to-four annual/four-year comparison | Slices 1 and 6 | Pure math suite and comparison E2E |
 | Official evidence and unresolved questions | Slice 7 | Firecrawl/domain/trigger tests and smoke |
@@ -1888,8 +1888,8 @@ Before Slice 0 deployment:
 
 Before Slice 5 live smoke:
 
-- Store an OpenAI API key with billing in the Convex development environment.
-- Approve `OPENAI_MODEL` after a small quality/cost check; keep it fixed for the MVP.
+- Store a Fireworks AI API key with credits in the Convex development environment.
+- Approve `FIREWORKS_MODEL` after a small quality/cost check; keep it fixed for the MVP.
 
 Before Slice 7 live smoke:
 
@@ -1930,7 +1930,7 @@ AidLens is complete only when every item is true:
 - [ ] Populated workspace deletion removes access and survives late async work/webhooks.
 - [ ] No real PII or secret exists in the repository, build artifacts, fixtures, screenshots, logs, or video.
 - [ ] Automated and manual accessibility gates pass.
-- [ ] OpenAI, Firecrawl, AgentMail, and Convex development smokes pass with synthetic data.
+- [ ] Fireworks AI, Firecrawl, AgentMail, and Convex development smokes pass with synthetic data.
 - [ ] Production rehearsal passes on the deployed app.
 - [ ] README, `hackathon.md`, public repo, live URL, video, social post, and submission are complete before the deadline.
 

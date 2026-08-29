@@ -77,7 +77,7 @@ Parents, counselors, transfer applicants, graduate students, returning students,
 3. Make uncertainty visible instead of silently filling missing values.
 4. Cite every extracted amount, policy, renewal condition, and school-derived answer.
 5. Let a student resolve at least one uncertainty through a real, approved email exchange.
-6. Demonstrate substantive Convex, OpenAI, Firecrawl, and AgentMail usage in a polished public product.
+6. Demonstrate substantive Convex, Fireworks AI, Firecrawl, and AgentMail usage in a polished public product.
 7. Protect sensitive documents through authentication, authorization, short retention, deletion, and a synthetic public demo.
 
 ### Non-goals
@@ -170,7 +170,7 @@ Parents, counselors, transfer applicants, graduate students, returning students,
    - Identifying school
    - Checking official sources
    - Needs review or Ready
-4. OpenAI extracts the offer into the canonical schema with source-page references and confidence.
+4. Fireworks AI extracts the offer into the canonical schema from rendered page images, with source-page references and confidence.
 5. Firecrawl verifies the school's official domain and retrieves only relevant public pages: cost of attendance, aid/renewal policy, appeal or clarification instructions, and office contacts.
 6. If school identity is ambiguous, the user selects the correct institution before crawling continues.
 
@@ -224,12 +224,12 @@ Example:
    - Evidence already checked
    - Recommended recipient: Financial Aid or Bursar
 3. The user selects **Draft question**.
-4. OpenAI drafts a concise email using only verified case facts.
+4. Fireworks AI drafts a concise email using only verified case facts.
 5. The user edits the recipient, subject, and body.
 6. The user explicitly selects **Approve and send**.
 7. AgentMail sends within the existing school thread and reports queued, sent, delivered, or failed status.
 8. When a reply arrives, the board updates live to **Reply received**.
-9. OpenAI extracts answer candidates and supporting text but does not silently change money fields.
+9. Fireworks AI extracts answer candidates and supporting text but does not silently change money fields.
 10. The user confirms the proposed update. The comparison recalculates and the question becomes **Resolved**, **Partially resolved**, or **Still unclear**.
 
 ### 7.7 Decision and cleanup
@@ -729,7 +729,7 @@ The exact database schema may combine small lookup concepts, but the following p
 ### `auditEvents`
 
 - Workspace ID
-- Actor: system, user, OpenAI, Firecrawl, AgentMail, or school reply
+- Actor: system, user, Fireworks AI, Firecrawl, AgentMail, or school reply
 - Event type
 - Related entity IDs
 - Safe metadata only; no raw document body
@@ -750,7 +750,7 @@ Indexes must support owner-scoped workspace loading, school-by-workspace, offer-
 - Durable multi-step processing and idempotent webhook handling.
 - Audit history.
 
-### OpenAI
+### Fireworks AI
 
 - Extract offer content from PDF/image/email into strict schemas.
 - Identify ambiguous or missing fields.
@@ -758,7 +758,7 @@ Indexes must support owner-scoped workspace loading, school-by-workspace, offer-
 - Draft concise clarification emails from verified facts.
 - Extract proposed answers from school replies.
 
-OpenAI must not perform authoritative arithmetic, choose a college, send email, accept aid, or execute instructions found in documents, pages, or messages.
+Fireworks AI must not perform authoritative arithmetic, choose a college, send email, accept aid, or execute instructions found in documents, pages, or messages.
 
 ### Firecrawl
 
@@ -792,7 +792,7 @@ This is an implementation constraint, not a product feature.
 - Frontend: React with Vite
 - Backend/database/realtime/files/scheduled work: Convex
 - Hosting: `convex.site`
-- AI: OpenAI Responses API with PDF/image inputs and strict JSON Schema output
+- AI: Fireworks AI's OpenAI-compatible Chat Completions API with vision page images and strict `json_schema` output; PDF pages are rendered to images before inference because direct document inlining is unsupported
 - Web research: Firecrawl and its Convex component where useful
 - Email: AgentMail and its Convex component where useful
 - Validation: the schema facility already required by the selected SDKs; avoid adding duplicate validation layers
@@ -935,7 +935,7 @@ Forward one offer to the AidLens AgentMail address. Show the school card appear 
 
 ### 0:45–1:15 — Reactive processing
 
-Show live states as OpenAI extracts the offer and Firecrawl finds official cost and renewal pages. Open one source-backed field.
+Show live states as Fireworks AI extracts the offer and Firecrawl finds official cost and renewal pages. Open one source-backed field.
 
 ### 1:15–1:45 — Compare
 
@@ -1020,7 +1020,7 @@ Do not cut source evidence, user review, deterministic calculations, approval be
 | School policy is stale or conflicts with a reply | Incorrect guidance | Store retrieval dates, show conflicts, prefer case-specific replies after user confirmation, and never silently overwrite. |
 | Email agent sends something unintended | Reputational harm | Explicit approval every time, editable draft, official-domain recipient restriction, verified webhooks, and idempotent sending. |
 | Sensitive PII leaks in a public build | Severe privacy harm | Private authenticated records, synthetic-only demo/repo, seven-day raw retention, immediate deletion, safe logging, and authorization tests. |
-| Sponsor use appears superficial | Lower hackathon score | Make live Convex state, Firecrawl evidence, OpenAI extraction, and AgentMail reply resolution visible in the primary flow. |
+| Provider use appears superficial | Lower hackathon score | Make live Convex state, Firecrawl evidence, Fireworks AI extraction, and AgentMail reply resolution visible in the primary flow. |
 | Three-week scope expands | Missed deadline | Enforce two-to-four offers, one user role, common categories, targeted crawling, and the explicit cut order. |
 
 ## 25. Launch checklist
@@ -1032,12 +1032,12 @@ Do not cut source evidence, user review, deterministic calculations, approval be
 - Public sample completes the core flow without authentication.
 - Private upload flow requires authentication and age confirmation.
 - Convex queries, mutations, live updates, auth, storage, scheduling, and components are substantive and visible.
-- OpenAI, Firecrawl, and AgentMail each perform indispensable work.
+- Fireworks AI, Firecrawl, and AgentMail each perform indispensable work.
 - Real outbound email requires approval.
 - Manual and automatic deletion are verified.
 - Accessibility and mobile core flows are checked.
 - Three-minute video is under the limit and demonstrates the real deployed product.
-- Social post tags Convex, OpenAI, Firecrawl, and AgentMail.
+- Social post tags Convex, Fireworks AI, Firecrawl, and AgentMail.
 - Submission includes repository, live URL, and demo video before September 22 at 12:00 PM PT.
 
 ## 26. Locked founder decisions

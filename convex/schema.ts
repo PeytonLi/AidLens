@@ -91,7 +91,7 @@ export default defineSchema({
     actor: v.union(
       v.literal("system"),
       v.literal("user"),
-      v.literal("openai"),
+      v.literal("fireworks"),
       v.literal("firecrawl"),
       v.literal("agentmail"),
       v.literal("school_reply"),

@@ -34,18 +34,21 @@ Runs format check, typecheck, lint, unit/behavior tests, and production build.
 
 Useful scripts:
 
-| Command             | Purpose                             |
-| ------------------- | ----------------------------------- |
-| `pnpm test:react`   | React behavior tests (jsdom)        |
-| `pnpm test:domain`  | Pure domain tests (Node)            |
-| `pnpm test:convex`  | Convex authorization/database tests |
-| `pnpm e2e`          | Chromium journeys and axe checks    |
-| `pnpm smoke:convex` | Disposable live dev ingestion flow  |
-| `pnpm typecheck`    | TypeScript                          |
-| `pnpm lint`         | ESLint                              |
-| `pnpm build`        | Production frontend build           |
+| Command                | Purpose                                  |
+| ---------------------- | ---------------------------------------- |
+| `pnpm test:react`      | React behavior tests (jsdom)             |
+| `pnpm test:domain`     | Pure domain tests (Node)                 |
+| `pnpm test:convex`     | Convex authorization/database tests      |
+| `pnpm e2e`             | Chromium journeys and axe checks         |
+| `pnpm smoke:convex`    | Disposable live dev ingestion flow       |
+| `pnpm smoke:fireworks` | One synthetic offer through Fireworks AI |
+| `pnpm typecheck`       | TypeScript                               |
+| `pnpm lint`            | ESLint                                   |
+| `pnpm build`           | Production frontend build                |
 
 `pnpm smoke:convex` requires a configured development deployment and Convex Auth. It creates only synthetic data and deletes its workspace before finishing; it is not part of pull-request CI.
+
+`pnpm smoke:fireworks` requires `FIREWORKS_API_KEY` and `FIREWORKS_MODEL` in the Convex development environment. It uses a synthetic document and is never part of pull-request CI.
 
 ## Deploy
 

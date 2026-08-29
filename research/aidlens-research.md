@@ -1,5 +1,7 @@
 # AidLens research brief
 
+> **Founder decision, August 28, 2026:** Fireworks AI replaces OpenAI for the implementation because OpenAI credits are unavailable. Fireworks uses strict `json_schema` Chat Completions and vision page images; PDFs must be rendered into bounded page images before inference. This knowingly forfeits the research brief's OpenAI-specific sponsor criterion unless the organizers approve the substitution. The original market research below is preserved as historical context.
+
 _Research date: August 27, 2026. Primary and first-party sources were preferred. Product-gap conclusions are inferences from the cited market scan, not proof that no competitor exists._
 
 ## Executive recommendation
