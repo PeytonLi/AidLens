@@ -268,6 +268,7 @@ export const commit = internalMutation({
         workspaceId: args.workspaceId,
         offerId,
         originalLabel: item.originalLabel,
+        extractedCanonicalCategory: item.canonicalCategory,
         canonicalCategory: item.canonicalCategory,
         extractedAmountCents: item.amountCents,
         extractedPeriod: item.period,

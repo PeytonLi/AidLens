@@ -72,7 +72,9 @@ export default defineSchema({
     sourceExcerpt: v.optional(v.string()),
     createdAt: v.number(),
     updatedAt: v.number(),
-  }).index("by_workspaceId", ["workspaceId"]),
+  })
+    .index("by_workspaceId", ["workspaceId"])
+    .index("by_sourceDocumentId", ["sourceDocumentId"]),
   offerDocuments: defineTable({
     workspaceId: v.id("workspaces"),
     schoolId: v.optional(v.id("schools")),
@@ -141,6 +143,7 @@ export default defineSchema({
     workspaceId: v.id("workspaces"),
     offerId: v.id("offers"),
     originalLabel: v.string(),
+    extractedCanonicalCategory: v.optional(aidCategory),
     canonicalCategory: aidCategory,
     extractedAmountCents: v.union(v.number(), v.null()),
     extractedPeriod: v.string(),

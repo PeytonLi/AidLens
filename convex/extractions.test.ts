@@ -35,6 +35,31 @@ const recordFailure = makeFunctionReference<
     attempt: number;
   }
 >("extractions:recordFailure");
+const confirmSchool = makeFunctionReference<
+  "mutation",
+  { offerId: Id<"offers">; schoolId: Id<"schools"> },
+  { status: "confirmed" }
+>("offers:confirmSchool");
+const getReview = makeFunctionReference<"query", { offerId: Id<"offers"> }>(
+  "offers:getReview",
+);
+const correctLineItem = makeFunctionReference<
+  "mutation",
+  {
+    lineItemId: Id<"lineItems">;
+    expectedRevision: number;
+    amountCents: number | null;
+    canonicalCategory: "direct_cost";
+    period: string;
+    status: "offered";
+    renewal: { kind: "unknown" };
+  }
+>("offers:correctLineItem");
+const confirmReviewed = makeFunctionReference<
+  "mutation",
+  { offerId: Id<"offers">; expectedRevision: number },
+  { status: "reviewed"; revision: number }
+>("offers:confirmReviewed");
 
 const extraction = {
   version: "v1" as const,
@@ -69,6 +94,21 @@ const extraction = {
           page: 1,
           region: "aid table",
           excerpt: "University Grant $10,000",
+        },
+      },
+      {
+        originalLabel: "Tuition and fees",
+        canonicalCategory: "direct_cost" as const,
+        amountCents: null,
+        period: "academic_year",
+        status: "offered" as const,
+        renewal: { kind: "unknown" as const },
+        requiredForCostTotal: true,
+        confidence: 0.4,
+        evidence: {
+          page: 1,
+          region: "cost table",
+          excerpt: "Tuition and fees amount unavailable",
         },
       },
     ],
@@ -112,7 +152,7 @@ test("S5.2: a validated extraction commits cited preliminary facts atomically", 
       createdAt: Date.now(),
       updatedAt: Date.now(),
     });
-    return { workspaceId, documentId, storageId };
+    return { userId, workspaceId, documentId, storageId };
   });
 
   await expect(
@@ -176,21 +216,111 @@ test("S5.2: a validated extraction commits cited preliminary facts atomically", 
   expect(persisted.offers).toEqual([
     expect.objectContaining({ reviewState: "preliminary", revision: 0 }),
   ]);
-  expect(persisted.items).toEqual([
-    expect.objectContaining({
-      originalLabel: "University Grant",
-      extractedAmountCents: 1_000_000,
-      amountCents: 1_000_000,
-      documentPage: 1,
-      sourceExcerpt: "University Grant $10,000",
-    }),
-  ]);
+  expect(persisted.items).toEqual(
+    expect.arrayContaining([
+      expect.objectContaining({
+        originalLabel: "University Grant",
+        extractedAmountCents: 1_000_000,
+        amountCents: 1_000_000,
+        documentPage: 1,
+        sourceExcerpt: "University Grant $10,000",
+      }),
+    ]),
+  );
   expect(persisted.schools).toEqual([
     expect.objectContaining({
       name: "Example University",
       identityState: "candidate",
     }),
   ]);
+  const owner = t.withIdentity({ subject: `${ids.userId}|test-session` });
+  const otherUserId = await t.run((ctx) =>
+    ctx.db.insert("users", { email: "other@example.com" }),
+  );
+  const other = t.withIdentity({ subject: `${otherUserId}|test-session` });
+  const offerId = persisted.offers[0]._id;
+  const schoolId = persisted.schools[0]._id;
+  await expect(
+    other.mutation(confirmSchool, { offerId, schoolId }),
+  ).rejects.toHaveProperty("message", "Not found");
+  await expect(
+    owner.mutation(confirmSchool, { offerId, schoolId }),
+  ).resolves.toEqual({ status: "confirmed" });
+  await expect(
+    t.run(async (ctx) => ({
+      offer: await ctx.db.get("offers", offerId),
+      school: await ctx.db.get("schools", schoolId),
+      document: await ctx.db.get("offerDocuments", ids.documentId),
+    })),
+  ).resolves.toMatchObject({
+    offer: { schoolId },
+    school: { identityState: "confirmed" },
+    document: { schoolId, processingState: "needs_review" },
+  });
+  const review = await owner.query(getReview, { offerId });
+  expect(review).toMatchObject({
+    offer: { _id: offerId, reviewState: "preliminary" },
+    school: { _id: schoolId, name: "Example University" },
+    items: [
+      {
+        originalLabel: "Tuition and fees",
+        amountCents: null,
+        requiredForCostTotal: true,
+        extractedConfidence: 0.4,
+      },
+      { originalLabel: "University Grant" },
+    ],
+  });
+  await expect(other.query(getReview, { offerId })).rejects.toHaveProperty(
+    "message",
+    "Not found",
+  );
+  const tuition = review.items[0];
+  await expect(
+    owner.mutation(confirmReviewed, { offerId, expectedRevision: 0 }),
+  ).rejects.toThrow("REVIEW_INCOMPLETE");
+  await expect(
+    owner.mutation(correctLineItem, {
+      lineItemId: tuition._id,
+      expectedRevision: 0,
+      amountCents: 2_500_000,
+      canonicalCategory: "direct_cost",
+      period: "academic_year",
+      status: "offered",
+      renewal: { kind: "unknown" },
+    }),
+  ).resolves.toEqual({ revision: 1, offerRevision: 1 });
+  await expect(
+    owner.mutation(correctLineItem, {
+      lineItemId: tuition._id,
+      expectedRevision: 0,
+      amountCents: 1,
+      canonicalCategory: "direct_cost",
+      period: "academic_year",
+      status: "offered",
+      renewal: { kind: "unknown" },
+    }),
+  ).rejects.toThrow("STALE_REVISION");
+  await expect(
+    t.run((ctx) => ctx.db.get("lineItems", tuition._id)),
+  ).resolves.toMatchObject({
+    extractedAmountCents: null,
+    extractedCanonicalCategory: "direct_cost",
+    amountCents: 2_500_000,
+    revision: 1,
+  });
+  await expect(
+    owner.mutation(confirmReviewed, { offerId, expectedRevision: 1 }),
+  ).resolves.toEqual({ status: "reviewed", revision: 1 });
+  await expect(
+    t.run(async (ctx) => ({
+      offer: await ctx.db.get("offers", offerId),
+      document: await ctx.db.get("offerDocuments", ids.documentId),
+    })),
+  ).resolves.toMatchObject({
+    offer: { reviewState: "reviewed", revision: 1 },
+    document: { processingState: "ready" },
+  });
 
   await t.run((ctx) =>
     ctx.db.patch("offerDocuments", ids.documentId, {
