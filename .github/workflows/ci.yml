@@ -32,3 +32,12 @@ jobs:
 
       - name: Quality gate
         run: pnpm check
+
+      - name: Install Chromium for Playwright
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: Public sample E2E
+        run: pnpm e2e:sample
+
+      - name: Auth boundary E2E
+        run: pnpm e2e:auth

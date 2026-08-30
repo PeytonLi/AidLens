@@ -149,3 +149,25 @@ export const sendApproved = internalAction({
     }
   },
 });
+
+export const smoke = internalAction({
+  args: {},
+  returns: v.object({
+    ok: v.literal(true),
+    inboxId: v.string(),
+    address: v.string(),
+  }),
+  handler: async () => {
+    const apiKey = process.env.AGENTMAIL_API_KEY;
+    if (!apiKey) throw new Error("AGENTMAIL_API_KEY is required");
+    const inbox = await createAgentMailInbox({
+      apiKey,
+      clientId: `aidlens-smoke-${Date.now()}`,
+    });
+    return {
+      ok: true as const,
+      inboxId: inbox.inboxId,
+      address: inbox.address,
+    };
+  },
+});

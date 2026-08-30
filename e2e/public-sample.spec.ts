@@ -84,4 +84,27 @@ test.describe("public sample journey", () => {
         .join("\n") || "no blocking violations",
     ).toEqual([]);
   });
+
+  test("landing has no critical or serious axe violations", async ({
+    page,
+  }) => {
+    await page.goto("/");
+
+    const results = await new AxeBuilder({ page })
+      .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"])
+      .analyze();
+
+    const blocking = results.violations.filter(
+      (v) => v.impact === "critical" || v.impact === "serious",
+    );
+
+    expect(
+      blocking,
+      blocking
+        .map(
+          (v) => `${v.impact}: ${v.id} — ${v.help} (${v.nodes.length} node(s))`,
+        )
+        .join("\n") || "no blocking violations",
+    ).toEqual([]);
+  });
 });

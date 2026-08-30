@@ -411,6 +411,54 @@ export const confirmReply = mutation({
   },
 });
 
+export const rejectReply = mutation({
+  args: {
+    proposalId: v.id("replyProposals"),
+    expectedProposalRevision: v.number(),
+    expectedQuestionRevision: v.number(),
+  },
+  returns: v.object({
+    proposalRevision: v.number(),
+    questionRevision: v.number(),
+  }),
+  handler: async (ctx, args) => {
+    const proposal = await ctx.db.get("replyProposals", args.proposalId);
+    if (!proposal || proposal.state !== "pending") throw new Error(NOT_FOUND);
+    const workspace = await requireActiveWorkspace(ctx, proposal.workspaceId);
+    const question = await ctx.db.get("questions", proposal.questionId);
+    if (
+      !question ||
+      question.workspaceId !== workspace._id ||
+      question.state !== "awaiting_confirmation" ||
+      proposal.revision !== args.expectedProposalRevision ||
+      question.revision !== args.expectedQuestionRevision
+    ) {
+      throw new Error("STALE_REVISION");
+    }
+    const now = Date.now();
+    const proposalRevision = proposal.revision + 1;
+    const questionRevision = question.revision + 1;
+    await ctx.db.patch("replyProposals", proposal._id, {
+      state: "rejected",
+      revision: proposalRevision,
+      updatedAt: now,
+    });
+    await ctx.db.patch("questions", question._id, {
+      state: "open",
+      revision: questionRevision,
+      updatedAt: now,
+    });
+    await ctx.db.insert("auditEvents", {
+      workspaceId: workspace._id,
+      actor: "user",
+      eventType: "school_reply_kept_unresolved",
+      safeMetadata: { reason: "proposal_rejected" },
+      createdAt: now,
+    });
+    return { proposalRevision, questionRevision };
+  },
+});
+
 const sendArgs = {
   approvalId: v.string(),
   workspaceId: v.id("workspaces"),

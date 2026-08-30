@@ -46,18 +46,14 @@ it("S8.8-S8.12: edits without sending and requires explicit off-domain approval"
   await user.clear(screen.getByLabelText("Recipient"));
   await user.type(screen.getByLabelText("Recipient"), "counselor@example.net");
   await user.click(screen.getByRole("button", { name: "Save draft" }));
-  await user.click(
-    screen.getByRole("button", { name: "Approve and queue email" }),
-  );
+  await user.click(screen.getByRole("button", { name: "Approve and send" }));
   expect(approve).not.toHaveBeenCalled();
   await user.click(
     screen.getByRole("checkbox", {
       name: /confirm this off-domain recipient/i,
     }),
   );
-  await user.click(
-    screen.getByRole("button", { name: "Approve and queue email" }),
-  );
+  await user.click(screen.getByRole("button", { name: "Approve and send" }));
   expect(approve).toHaveBeenCalledWith({
     expectedRevision: 2,
     offDomainConfirmed: true,
@@ -67,6 +63,7 @@ it("S8.8-S8.12: edits without sending and requires explicit off-domain approval"
 it("S8.17-S8.21: shows reply evidence and confirms an edited proposal explicitly", async () => {
   const user = userEvent.setup();
   const confirmReply = vi.fn().mockResolvedValue(undefined);
+  const keepUnresolved = vi.fn().mockResolvedValue(undefined);
   render(
     <QuestionDraftPage
       data={{
@@ -91,6 +88,7 @@ it("S8.17-S8.21: shows reply evidence and confirms an edited proposal explicitly
       onSave={vi.fn()}
       onApprove={vi.fn()}
       onConfirmReply={confirmReply}
+      onKeepUnresolved={keepUnresolved}
     />,
   );
 
@@ -100,13 +98,51 @@ it("S8.17-S8.21: shows reply evidence and confirms an edited proposal explicitly
   await user.selectOptions(screen.getByLabelText("Confirmed renewal"), "fixed");
   await user.clear(screen.getByLabelText("Renewal years"));
   await user.type(screen.getByLabelText("Renewal years"), "4");
-  await user.click(screen.getByRole("button", { name: "Confirm reply fact" }));
+  await user.click(screen.getByRole("button", { name: "Confirm update" }));
   expect(confirmReply).toHaveBeenCalledWith({
     proposalId: "proposal-1",
     expectedProposalRevision: 0,
     expectedQuestionRevision: 3,
     expectedLineItemRevision: 0,
     renewal: { kind: "fixed", durationYears: 4 },
+  });
+});
+
+it("S8.21: keep unresolved rejects the proposal without changing totals", async () => {
+  const user = userEvent.setup();
+  const keepUnresolved = vi.fn().mockResolvedValue(undefined);
+  render(
+    <QuestionDraftPage
+      data={{
+        question: { prompt: "Is it renewable?", revision: 3 },
+        school: { name: "Example University", officialDomain: "example.edu" },
+        draft: {
+          _id: "draft-1",
+          recipient: "aid@example.edu",
+          subject: "Renewal",
+          bodyText: "Is it renewable?",
+          status: "delivered",
+          revision: 1,
+        },
+        proposal: {
+          _id: "proposal-1",
+          supportingText: "Renewable for four years.",
+          revision: 0,
+        },
+        lineItem: { revision: 0 },
+      }}
+      onOpen={vi.fn()}
+      onSave={vi.fn()}
+      onApprove={vi.fn()}
+      onKeepUnresolved={keepUnresolved}
+    />,
+  );
+
+  await user.click(screen.getByRole("button", { name: "Keep unresolved" }));
+  expect(keepUnresolved).toHaveBeenCalledWith({
+    proposalId: "proposal-1",
+    expectedProposalRevision: 0,
+    expectedQuestionRevision: 3,
   });
 });
 

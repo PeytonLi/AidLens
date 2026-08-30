@@ -20,6 +20,7 @@ import OfferReviewPage, { type OfferReview } from "../review/OfferReviewPage";
 import ComparisonPage, {
   type ComparisonData,
 } from "../comparison/ComparisonPage";
+import DecisionPage, { type DecisionData } from "../decision/DecisionPage";
 import ResearchPage from "../research/ResearchPage";
 import QuestionDraftPage, {
   type QuestionDraftData,
@@ -199,6 +200,19 @@ const confirmQuestionReply = makeFunctionReference<
     renewal: Doc<"lineItems">["renewal"];
   }
 >("questions:confirmReply");
+const rejectQuestionReply = makeFunctionReference<
+  "mutation",
+  {
+    proposalId: Id<"replyProposals">;
+    expectedProposalRevision: number;
+    expectedQuestionRevision: number;
+  }
+>("questions:rejectReply");
+const chooseCurrentSchool = makeFunctionReference<
+  "mutation",
+  { workspaceId: Id<"workspaces">; schoolId: Id<"schools"> },
+  Id<"schools">
+>("workspaces:chooseCurrentSchool");
 
 function usePrivatePreviews(documents: DocumentSummary[] | undefined) {
   const token = useAuthToken();
@@ -563,6 +577,7 @@ function WorkspacePage() {
         );
       })}
       <Link to="/compare">Compare offers</Link>
+      <Link to="/decision">Your decision</Link>
       {(questions ?? []).map((question) => (
         <Link key={question._id} to={`/questions/${question._id}/draft`}>
           Clarify: {question.prompt}
@@ -643,6 +658,53 @@ function ComparisonRoute() {
   );
 }
 
+function DecisionRoute() {
+  const workspace = useQuery(getCurrentWorkspace, {});
+  const comparison = useQuery(
+    getComparison,
+    workspace ? { workspaceId: workspace._id } : "skip",
+  );
+  const questions = useQuery(
+    listQuestions,
+    workspace ? { workspaceId: workspace._id } : "skip",
+  );
+  const chooseSchool = useMutation(chooseCurrentSchool);
+  if (
+    workspace === undefined ||
+    comparison === undefined ||
+    questions === undefined
+  ) {
+    return <SessionStatus />;
+  }
+  if (workspace === null) return <Navigate to="/" replace />;
+  const openQuestionCount = questions.filter((question) =>
+    [
+      "open",
+      "drafting",
+      "queued",
+      "sent",
+      "delivered",
+      "reply_received",
+      "awaiting_confirmation",
+      "partially_resolved",
+    ].includes(question.state),
+  ).length;
+  const data: DecisionData = {
+    settings: comparison.settings,
+    currentChoiceSchoolId: workspace.currentChoiceSchoolId ?? null,
+    offers: comparison.offers,
+    openQuestionCount,
+  };
+  return (
+    <DecisionPage
+      data={data}
+      onChooseSchool={(schoolId) =>
+        chooseSchool({ workspaceId: workspace._id, schoolId })
+      }
+    />
+  );
+}
+
 function ResearchRoute() {
   const match = useLocation().pathname.match(/^\/schools\/([^/]+)$/);
   const schoolId = match?.[1] as Id<"schools"> | undefined;
@@ -670,6 +732,7 @@ function QuestionDraftRoute() {
   const save = useMutation(saveQuestionDraft);
   const approve = useMutation(approveQuestionDraft);
   const confirmReply = useMutation(confirmQuestionReply);
+  const rejectReply = useMutation(rejectQuestionReply);
   if (!questionId) return <Navigate to="/workspace" replace />;
   if (data === undefined) return <SessionStatus />;
   return (
@@ -691,6 +754,12 @@ function QuestionDraftRoute() {
         confirmReply({
           ...confirmation,
           proposalId: confirmation.proposalId as Id<"replyProposals">,
+        })
+      }
+      onKeepUnresolved={(rejection) =>
+        rejectReply({
+          ...rejection,
+          proposalId: rejection.proposalId as Id<"replyProposals">,
         })
       }
     />
@@ -737,6 +806,7 @@ function PrivateRoute() {
   const { pathname } = useLocation();
   if (pathname === "/workspace") return <WorkspacePage />;
   if (pathname === "/compare") return <ComparisonRoute />;
+  if (pathname === "/decision") return <DecisionRoute />;
   if (/^\/schools\/[^/]+$/.test(pathname)) return <ResearchRoute />;
   if (/^\/questions\/[^/]+\/draft$/.test(pathname))
     return <QuestionDraftRoute />;

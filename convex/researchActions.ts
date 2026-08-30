@@ -78,3 +78,27 @@ export const run = internalAction({
     }
   },
 });
+
+export const smoke = internalAction({
+  args: {},
+  returns: v.object({
+    ok: v.literal(true),
+    domain: v.string(),
+    resultCount: v.number(),
+  }),
+  handler: async () => {
+    const apiKey = process.env.FIRECRAWL_API_KEY;
+    if (!apiKey) throw new Error("FIRECRAWL_API_KEY is required");
+    const domain = process.env.SMOKE_FIRECRAWL_DOMAIN ?? "www.ucsd.edu";
+    const results = await searchOfficialPages({
+      apiKey,
+      domain,
+      query: "cost of attendance financial aid",
+    });
+    return {
+      ok: true as const,
+      domain,
+      resultCount: results.length,
+    };
+  },
+});

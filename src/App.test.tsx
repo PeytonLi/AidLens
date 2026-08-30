@@ -2,6 +2,7 @@ import { cleanup, render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, describe, expect, it } from "vitest";
 import App from "./App";
+import { TestAuthProvider } from "./test/TestAuthProvider";
 
 afterEach(() => {
   cleanup();
@@ -10,9 +11,11 @@ afterEach(() => {
 describe("landing shell", () => {
   it("shows AidLens brand and primary CTAs", () => {
     render(
-      <MemoryRouter>
-        <App />
-      </MemoryRouter>,
+      <TestAuthProvider>
+        <MemoryRouter>
+          <App />
+        </MemoryRouter>
+      </TestAuthProvider>,
     );
 
     expect(
@@ -28,9 +31,11 @@ describe("landing shell", () => {
 
   it("renders a safe not-found page without echoing an unknown path", () => {
     render(
-      <MemoryRouter initialEntries={["/missing/private-secret"]}>
-        <App />
-      </MemoryRouter>,
+      <TestAuthProvider>
+        <MemoryRouter initialEntries={["/missing/private-secret"]}>
+          <App />
+        </MemoryRouter>
+      </TestAuthProvider>,
     );
 
     expect(

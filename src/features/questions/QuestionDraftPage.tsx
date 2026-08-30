@@ -27,6 +27,7 @@ export default function QuestionDraftPage({
   onSave,
   onApprove,
   onConfirmReply,
+  onKeepUnresolved,
 }: {
   data: QuestionDraftData;
   onOpen: () => Promise<unknown>;
@@ -48,6 +49,11 @@ export default function QuestionDraftPage({
     renewal:
       | { kind: "fixed"; durationYears: number }
       | { kind: "one_time" | "nonrenewable" | "conditional" | "unknown" };
+  }) => Promise<unknown>;
+  onKeepUnresolved?: (rejection: {
+    proposalId: string;
+    expectedProposalRevision: number;
+    expectedQuestionRevision: number;
   }) => Promise<unknown>;
 }) {
   const [recipient, setRecipient] = useState(data.draft?.recipient ?? "");
@@ -174,7 +180,7 @@ export default function QuestionDraftPage({
       >
         {data.draft.status === "failed"
           ? "Retry approved email"
-          : "Approve and queue email"}
+          : "Approve and send"}
       </button>
       {showRecipientWarning ? (
         <label>
@@ -240,7 +246,20 @@ export default function QuestionDraftPage({
               });
             }}
           >
-            Confirm reply fact
+            Confirm update
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              if (!onKeepUnresolved) return;
+              void onKeepUnresolved({
+                proposalId: data.proposal?._id ?? "",
+                expectedProposalRevision: data.proposal?.revision ?? 0,
+                expectedQuestionRevision: data.question.revision ?? 0,
+              });
+            }}
+          >
+            Keep unresolved
           </button>
         </section>
       ) : null}

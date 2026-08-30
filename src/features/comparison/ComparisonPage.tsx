@@ -216,6 +216,11 @@ export default function ComparisonPage({ data, onUpdateSettings }: Props) {
           </tbody>
         </table>
       </div>
+      <p>
+        <Link to="/decision">Your decision</Link>
+        {" · "}
+        <Link to="/workspace">Workspace</Link>
+      </p>
     </main>
   );
 }

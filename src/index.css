@@ -1070,3 +1070,47 @@ a:focus-visible,
   font-size: 0.75rem;
   font-weight: 500;
 }
+
+.decision-page {
+  width: min(100% - 2rem, 52rem);
+  margin-inline: auto;
+  padding-block: clamp(2rem, 6vw, 5rem);
+  display: grid;
+  gap: var(--space-4);
+}
+
+.decision-page h1,
+.decision-page h2,
+.decision-page p {
+  margin: 0;
+}
+
+.decision-page > p {
+  color: var(--color-ink-muted);
+}
+
+.decision-school-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: var(--space-4);
+}
+
+.decision-school {
+  display: grid;
+  gap: var(--space-2);
+  padding: var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: 0.75rem;
+  background: var(--color-surface);
+}
+
+.decision-school--current {
+  border-color: var(--color-brand);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--color-brand) 35%, transparent);
+}
+
+.decision-school button {
+  width: fit-content;
+}

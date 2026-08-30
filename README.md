@@ -32,36 +32,58 @@ pnpm check
 
 Runs format check, typecheck, lint, unit/behavior tests, and production build.
 
+Pull-request CI also runs Chromium Playwright for the public sample and signed-out private-route boundaries (`pnpm e2e:sample`, `pnpm e2e:auth`).
+
 Useful scripts:
 
-| Command                | Purpose                                  |
-| ---------------------- | ---------------------------------------- |
-| `pnpm test:react`      | React behavior tests (jsdom)             |
-| `pnpm test:domain`     | Pure domain tests (Node)                 |
-| `pnpm test:convex`     | Convex authorization/database tests      |
-| `pnpm e2e`             | Chromium journeys and axe checks         |
-| `pnpm smoke:convex`    | Disposable live dev ingestion flow       |
-| `pnpm smoke:fireworks` | One synthetic offer through Fireworks AI |
-| `pnpm typecheck`       | TypeScript                               |
-| `pnpm lint`            | ESLint                                   |
-| `pnpm build`           | Production frontend build                |
+| Command                | Purpose                                                         |
+| ---------------------- | --------------------------------------------------------------- |
+| `pnpm test:react`      | React behavior tests (jsdom)                                    |
+| `pnpm test:domain`     | Pure domain tests (Node)                                        |
+| `pnpm test:convex`     | Convex authorization/database tests                             |
+| `pnpm test:contract`   | Provider contract fixtures (Fireworks / Firecrawl / AgentMail)  |
+| `pnpm test:eval`       | Extraction fixture regression (`convex/lib/fireworks.test.ts`)  |
+| `pnpm e2e`             | Chromium journeys and axe checks                                |
+| `pnpm e2e:sample`      | Public sample journey (CI)                                      |
+| `pnpm e2e:auth`        | Signed-out private routes + approval-safety (CI)                |
+| `pnpm smoke:convex`    | Disposable live dev ingestion flow                              |
+| `pnpm smoke:fireworks` | One synthetic offer through Fireworks AI                        |
+| `pnpm smoke:firecrawl` | Official-domain Firecrawl search (requires `RUN_LIVE_SMOKE=1`)  |
+| `pnpm smoke:agentmail` | Controlled AgentMail inbox create (requires `RUN_LIVE_SMOKE=1`) |
+| `pnpm smoke:all`       | All development-deployment smokes                               |
+| `pnpm typecheck`       | TypeScript                                                      |
+| `pnpm lint`            | ESLint                                                          |
+| `pnpm build`           | Production frontend build                                       |
 
-`pnpm smoke:convex` requires a configured development deployment and Convex Auth. It creates only synthetic data and deletes its workspace before finishing; it is not part of pull-request CI.
+Live smokes require a configured development deployment and Convex Auth / vendor keys. They create only synthetic or disposable data where possible and are **not** part of pull-request CI.
 
-`pnpm smoke:fireworks` requires `FIREWORKS_API_KEY` and `FIREWORKS_MODEL` in the Convex development environment. It uses a synthetic document and is never part of pull-request CI.
+## Product surfaces
+
+| Route                  | Access  | Notes                                                                |
+| ---------------------- | ------- | -------------------------------------------------------------------- |
+| `/`                    | Public  | Landing CTAs                                                         |
+| `/sample`              | Public  | UCSD / Loyola synthetic comparison; no mutations                     |
+| `/auth`                | Public  | Convex Auth email/password + 18+ confirmation                        |
+| `/workspace`           | Private | Upload, offers, questions, delete workspace                          |
+| `/compare`             | Private | Private comparison; Conservative / Optimistic                        |
+| `/decision`            | Private | Student marks current choice; AidLens never ranks schools            |
+| `/schools/:id`         | Private | Official-page research evidence                                      |
+| `/questions/:id/draft` | Private | Draft, **Approve and send**, **Confirm update**, **Keep unresolved** |
 
 ## Deploy
 
 When you are ready to publish AidLens:
 
 1. Ensure Convex Auth and site hosting are configured for this project.
-2. Set dashboard environment variables from `.env.example` (vendor keys later).
-3. Deploy with the scaffold-supported Convex flow, typically:
+2. Set dashboard environment variables from `.env.example` (vendor keys never in git).
+3. Deploy with:
 
 ```bash
 npx convex deploy
 ```
 
 4. Confirm the deployed site shows the **AidLens** heading and primary CTAs.
+5. Run `pnpm smoke:all` against the development deployment before promoting production credentials.
+6. Complete the founder checklist in [hackathon.md](./hackathon.md).
 
-Do not commit secrets or generated credentials. See [hackathon.md](./hackathon.md) for the product pitch.
+Do not commit secrets or generated credentials. Trust boundaries are summarized in [docs/TRUST_BOUNDARIES.md](./docs/TRUST_BOUNDARIES.md). See [hackathon.md](./hackathon.md) for the product pitch and founder release checklist.

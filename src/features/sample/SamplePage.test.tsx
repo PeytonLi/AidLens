@@ -4,6 +4,7 @@ import { MemoryRouter } from "react-router-dom";
 import { afterEach, describe, expect, it } from "vitest";
 import App from "../../App";
 import { calculateComparison } from "../../domain/comparison";
+import { TestAuthProvider } from "../../test/TestAuthProvider";
 import { buildSampleComparisonInput } from "./fixtures";
 import { formatUsd } from "./money";
 
@@ -13,9 +14,11 @@ afterEach(() => {
 
 function renderApp(initialPath = "/") {
   return render(
-    <MemoryRouter initialEntries={[initialPath]}>
-      <App />
-    </MemoryRouter>,
+    <TestAuthProvider>
+      <MemoryRouter initialEntries={[initialPath]}>
+        <App />
+      </MemoryRouter>
+    </TestAuthProvider>,
   );
 }
 

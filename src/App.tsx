@@ -1,3 +1,4 @@
+import { Authenticated, AuthLoading, Unauthenticated } from "convex/react";
 import { Link, Route, Routes } from "react-router-dom";
 import type { ReactNode } from "react";
 import AccountRoutes from "./features/auth/AccountRoutes";
@@ -63,6 +64,25 @@ function LandingPage() {
   );
 }
 
+function PrimaryNav() {
+  return (
+    <nav aria-label="Primary">
+      <Link to="/sample">Sample</Link>
+      <AuthLoading>
+        <span>Checking session…</span>
+      </AuthLoading>
+      <Unauthenticated>
+        <Link to="/auth">Sign in</Link>
+      </Unauthenticated>
+      <Authenticated>
+        <Link to="/workspace">Workspace</Link>
+        <Link to="/compare">Compare</Link>
+        <Link to="/decision">Decision</Link>
+      </Authenticated>
+    </nav>
+  );
+}
+
 function AppShell({ children }: { children: ReactNode }) {
   return (
     <div className="app-shell">
@@ -75,10 +95,7 @@ function AppShell({ children }: { children: ReactNode }) {
           <p className="brand-mark" aria-hidden="true">
             AidLens
           </p>
-          <nav aria-label="Primary">
-            <Link to="/sample">Sample</Link>
-            <Link to="/auth">Sign in</Link>
-          </nav>
+          <PrimaryNav />
         </div>
       </header>
 

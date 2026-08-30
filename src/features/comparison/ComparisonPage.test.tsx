@@ -55,15 +55,17 @@ it("S6 comparison: shows explicit states, assumptions, totals, and reactive cont
   const user = userEvent.setup();
   const update = vi.fn().mockResolvedValue(undefined);
   render(
-    <ComparisonPage
-      data={
-        {
-          settings: { annualCostGrowthBps: 300, scenario: "conservative" },
-          offers: [offer("one", "Alpha"), offer("two", "Beta", false)],
-        } as ComparisonData
-      }
-      onUpdateSettings={update}
-    />,
+    <MemoryRouter>
+      <ComparisonPage
+        data={
+          {
+            settings: { annualCostGrowthBps: 300, scenario: "conservative" },
+            offers: [offer("one", "Alpha"), offer("two", "Beta", false)],
+          } as ComparisonData
+        }
+        onUpdateSettings={update}
+      />
+    </MemoryRouter>,
   );
 
   expect(screen.getByRole("heading", { name: "Compare offers" })).toBeVisible();
